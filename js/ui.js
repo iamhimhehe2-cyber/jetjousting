@@ -3,7 +3,6 @@
 export class UIManager {
     constructor(callbacks = {}) {
         this.callbacks = callbacks;
-        this.dom = null; // Will be lazy-loaded
         
         // Upgrade costs & max levels definitions
         this.upgradeConfig = {
@@ -22,176 +21,185 @@ export class UIManager {
         // Last speed multiplier for pulsing
         this.lastDmgMult = 1.0;
 
-        // Initialize after DOM is ready
-        this.initEventListeners();
+        // Cache DOM elements immediately
+        this.cacheDOM();
+        // Then attach listeners when ready
+        this.attachListeners();
     }
 
-    getDOM() {
-        // Lazy load DOM elements on first access
-        if (!this.dom) {
-            this.dom = {
-                container: document.getElementById('game-container'),
-                hud: document.getElementById('hud'),
-                healthFill: document.getElementById('hud-health'),
-                boostFill: document.getElementById('hud-boost'),
-                speedVal: document.getElementById('hud-speed-val'),
-                multiplier: document.getElementById('hud-multiplier'),
-                wave: document.getElementById('hud-wave'),
-                enemies: document.getElementById('hud-enemies'),
-                gold: document.getElementById('hud-gold'),
-                
-                // Overlays
-                mainMenu: document.getElementById('main-menu'),
-                stableMenu: document.getElementById('stable-menu'),
-                waveClearMenu: document.getElementById('wave-clear-menu'),
-                gameOverMenu: document.getElementById('game-over-menu'),
-                onlineMenu: document.getElementById('online-menu'),
-                
-                // Buttons
-                btnStart: document.getElementById('btn-start'),
-                btnOnline: document.getElementById('btn-online'),
-                btnStableMain: document.getElementById('btn-stable-main'),
-                btnStableBack: document.getElementById('btn-stable-back'),
-                btnStableStart: document.getElementById('btn-stable-start'),
-                btnStableLoot: document.getElementById('btn-stable-loot'),
-                btnStableGo: document.getElementById('btn-stable-go'),
-                btnNextWave: document.getElementById('btn-next-wave'),
-                btnRetry: document.getElementById('btn-retry'),
-                
-                // Shop Details
-                shopGold: document.getElementById('shop-gold'),
-                waveClearNum: document.getElementById('wave-clear-num'),
-                waveClearLoot: document.getElementById('wave-clear-loot'),
-                goWaves: document.getElementById('go-waves'),
-                goMaxSpeed: document.getElementById('go-max-speed'),
-                goMaxDmg: document.getElementById('go-max-dmg')
-            };
-        }
-        return this.dom;
+    cacheDOM() {
+        this.dom = {
+            container: document.getElementById('game-container'),
+            hud: document.getElementById('hud'),
+            healthFill: document.getElementById('hud-health'),
+            boostFill: document.getElementById('hud-boost'),
+            speedVal: document.getElementById('hud-speed-val'),
+            multiplier: document.getElementById('hud-multiplier'),
+            wave: document.getElementById('hud-wave'),
+            enemies: document.getElementById('hud-enemies'),
+            gold: document.getElementById('hud-gold'),
+            
+            // Overlays
+            mainMenu: document.getElementById('main-menu'),
+            stableMenu: document.getElementById('stable-menu'),
+            waveClearMenu: document.getElementById('wave-clear-menu'),
+            gameOverMenu: document.getElementById('game-over-menu'),
+            onlineMenu: document.getElementById('online-menu'),
+            
+            // Buttons
+            btnStart: document.getElementById('btn-start'),
+            btnOnline: document.getElementById('btn-online'),
+            btnStableMain: document.getElementById('btn-stable-main'),
+            btnStableBack: document.getElementById('btn-stable-back'),
+            btnStableStart: document.getElementById('btn-stable-start'),
+            btnStableLoot: document.getElementById('btn-stable-loot'),
+            btnStableGo: document.getElementById('btn-stable-go'),
+            btnNextWave: document.getElementById('btn-next-wave'),
+            btnRetry: document.getElementById('btn-retry'),
+            
+            // Shop Details
+            shopGold: document.getElementById('shop-gold'),
+            waveClearNum: document.getElementById('wave-clear-num'),
+            waveClearLoot: document.getElementById('wave-clear-loot'),
+            goWaves: document.getElementById('go-waves'),
+            goMaxSpeed: document.getElementById('go-max-speed'),
+            goMaxDmg: document.getElementById('go-max-dmg')
+        };
     }
 
-    initEventListeners() {
-        // Use setTimeout to ensure DOM is ready
-        setTimeout(() => {
-            const dom = this.getDOM();
-            const blurActive = () => {
-                if (document.activeElement && typeof document.activeElement.blur === 'function') {
-                    document.activeElement.blur();
-                }
-            };
+    attachListeners() {
+        const blurActive = () => {
+            if (document.activeElement && typeof document.activeElement.blur === 'function') {
+                document.activeElement.blur();
+            }
+        };
 
-            // Main Menu
-            if (dom.btnStart) {
-                dom.btnStart.addEventListener('click', () => {
-                    blurActive();
-                    this.callbacks.onStartGame();
-                });
-            }
-            
-            if (dom.btnOnline) {
-                dom.btnOnline.addEventListener('click', () => {
-                    blurActive();
-                    this.showOverlay('online');
-                });
-            }
-            
-            if (dom.btnStableMain) {
-                dom.btnStableMain.addEventListener('click', () => {
-                    blurActive();
-                    this.showOverlay('stable');
-                });
-            }
-            
-            // Stable Menu (Upgrade Shop)
-            if (dom.btnStableBack) {
-                dom.btnStableBack.addEventListener('click', () => {
-                    blurActive();
-                    this.showOverlay('main');
-                });
-            }
-            
-            if (dom.btnStableStart) {
-                dom.btnStableStart.addEventListener('click', () => {
-                    blurActive();
-                    this.callbacks.onStartGame();
-                });
-            }
-            
-            // Wave Clear
-            if (dom.btnNextWave) {
-                dom.btnNextWave.addEventListener('click', () => {
-                    blurActive();
-                    this.callbacks.onNextWave();
-                });
-            }
-            
-            if (dom.btnStableLoot) {
-                dom.btnStableLoot.addEventListener('click', () => {
-                    blurActive();
-                    this.showOverlay('stable');
-                });
-            }
-            
-            // Game Over
-            if (dom.btnRetry) {
-                dom.btnRetry.addEventListener('click', () => {
-                    blurActive();
-                    this.callbacks.onResetGame();
-                });
-            }
-            
-            if (dom.btnStableGo) {
-                dom.btnStableGo.addEventListener('click', () => {
-                    blurActive();
-                    this.showOverlay('stable');
-                });
-            }
-
-            // Bind all "Upgrade/Buy" buttons in stables
-            const buyButtons = document.querySelectorAll('.btn-buy');
-            buyButtons.forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    blurActive();
-                    const type = e.target.getAttribute('data-upgrade');
-                    this.callbacks.onBuyUpgrade(type);
-                });
+        // Main Menu - ENTER ARENA
+        if (this.dom.btnStart) {
+            this.dom.btnStart.addEventListener('click', () => {
+                console.log('[UI] ENTER ARENA clicked');
+                blurActive();
+                this.callbacks.onStartGame();
             });
-        }, 0);
+        }
+        
+        // Main Menu - ONLINE 1v1
+        if (this.dom.btnOnline) {
+            this.dom.btnOnline.addEventListener('click', () => {
+                console.log('[UI] ONLINE 1v1 clicked');
+                blurActive();
+                this.showOverlay('online');
+            });
+        }
+        
+        // Main Menu - THE JET STABLES
+        if (this.dom.btnStableMain) {
+            this.dom.btnStableMain.addEventListener('click', () => {
+                console.log('[UI] THE JET STABLES clicked');
+                blurActive();
+                this.showOverlay('stable');
+            });
+        }
+        
+        // Stable Menu - BACK TO MENU
+        if (this.dom.btnStableBack) {
+            this.dom.btnStableBack.addEventListener('click', () => {
+                console.log('[UI] BACK TO MENU clicked');
+                blurActive();
+                this.showOverlay('main');
+            });
+        }
+        
+        // Stable Menu - START JOUST
+        if (this.dom.btnStableStart) {
+            this.dom.btnStableStart.addEventListener('click', () => {
+                console.log('[UI] START JOUST clicked');
+                blurActive();
+                this.callbacks.onStartGame();
+            });
+        }
+        
+        // Wave Clear - NEXT WAVE
+        if (this.dom.btnNextWave) {
+            this.dom.btnNextWave.addEventListener('click', () => {
+                console.log('[UI] NEXT WAVE clicked');
+                blurActive();
+                this.callbacks.onNextWave();
+            });
+        }
+        
+        // Wave Clear - VISIT STABLES
+        if (this.dom.btnStableLoot) {
+            this.dom.btnStableLoot.addEventListener('click', () => {
+                console.log('[UI] VISIT STABLES (loot) clicked');
+                blurActive();
+                this.showOverlay('stable');
+            });
+        }
+        
+        // Game Over - JOUST AGAIN
+        if (this.dom.btnRetry) {
+            this.dom.btnRetry.addEventListener('click', () => {
+                console.log('[UI] JOUST AGAIN clicked');
+                blurActive();
+                this.callbacks.onResetGame();
+            });
+        }
+        
+        // Game Over - VISIT STABLES
+        if (this.dom.btnStableGo) {
+            this.dom.btnStableGo.addEventListener('click', () => {
+                console.log('[UI] VISIT STABLES (go) clicked');
+                blurActive();
+                this.showOverlay('stable');
+            });
+        }
+
+        // Bind all "Upgrade/Buy" buttons in stables
+        const buyButtons = document.querySelectorAll('.btn-buy');
+        buyButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                blurActive();
+                const type = e.target.getAttribute('data-upgrade');
+                console.log('[UI] Buy upgrade:', type);
+                this.callbacks.onBuyUpgrade(type);
+            });
+        });
     }
 
     showOverlay(name) {
-        const dom = this.getDOM();
+        console.log('[UI] showOverlay:', name);
         
         // Hide all overlays first
-        dom.mainMenu.classList.add('hidden');
-        dom.stableMenu.classList.add('hidden');
-        dom.waveClearMenu.classList.add('hidden');
-        dom.gameOverMenu.classList.add('hidden');
-        dom.onlineMenu.classList.add('hidden');
-        dom.hud.classList.add('hidden');
+        if (this.dom.mainMenu) this.dom.mainMenu.classList.add('hidden');
+        if (this.dom.stableMenu) this.dom.stableMenu.classList.add('hidden');
+        if (this.dom.waveClearMenu) this.dom.waveClearMenu.classList.add('hidden');
+        if (this.dom.gameOverMenu) this.dom.gameOverMenu.classList.add('hidden');
+        if (this.dom.onlineMenu) this.dom.onlineMenu.classList.add('hidden');
+        if (this.dom.hud) this.dom.hud.classList.add('hidden');
 
         // Stop active screen shake on entering any menu overlay
         if (name !== 'game') {
             this.shakeTime = 0;
             this.shakeIntensity = 0;
             this.shakeOffset = { x: 0, y: 0 };
-            dom.container.classList.remove('shake-active');
+            if (this.dom.container) this.dom.container.classList.remove('shake-active');
         }
 
         // Show requested
         if (name === 'game') {
-            dom.hud.classList.remove('hidden');
+            if (this.dom.hud) this.dom.hud.classList.remove('hidden');
         } else if (name === 'main') {
-            dom.mainMenu.classList.remove('hidden');
+            if (this.dom.mainMenu) this.dom.mainMenu.classList.remove('hidden');
         } else if (name === 'stable') {
-            dom.stableMenu.classList.remove('hidden');
-            this.callbacks.onOpenStable(); // Trigger gold and button update
+            if (this.dom.stableMenu) this.dom.stableMenu.classList.remove('hidden');
+            if (this.callbacks.onOpenStable) this.callbacks.onOpenStable();
         } else if (name === 'waveClear') {
-            dom.waveClearMenu.classList.remove('hidden');
+            if (this.dom.waveClearMenu) this.dom.waveClearMenu.classList.remove('hidden');
         } else if (name === 'gameOver') {
-            dom.gameOverMenu.classList.remove('hidden');
+            if (this.dom.gameOverMenu) this.dom.gameOverMenu.classList.remove('hidden');
         } else if (name === 'online') {
-            dom.onlineMenu.classList.remove('hidden');
+            if (this.dom.onlineMenu) this.dom.onlineMenu.classList.remove('hidden');
         }
     }
 
@@ -204,21 +212,19 @@ export class UIManager {
     }
 
     updateEffects() {
-        const dom = this.getDOM();
-        
         // Process screen shake decay
         if (this.shakeTime > 0) {
             this.shakeOffset.x = (Math.random() - 0.5) * this.shakeIntensity;
             this.shakeOffset.y = (Math.random() - 0.5) * this.shakeIntensity;
             
             // Add visual shake effect class to HTML container to make HUD shake too
-            dom.container.classList.add('shake-active');
+            if (this.dom.container) this.dom.container.classList.add('shake-active');
             
             this.shakeTime--;
             if (this.shakeTime <= 0) {
                 this.shakeOffset.x = 0;
                 this.shakeOffset.y = 0;
-                dom.container.classList.remove('shake-active');
+                if (this.dom.container) this.dom.container.classList.remove('shake-active');
             }
         }
     }
@@ -227,48 +233,44 @@ export class UIManager {
      * Update HUD stats during active game
      */
     updateHUD(player, wave, enemiesLeft, gold) {
-        const dom = this.getDOM();
-        
         // Health bar
         const healthPercent = (player.health / player.maxHealth) * 100;
-        dom.healthFill.style.width = `${healthPercent}%`;
+        if (this.dom.healthFill) this.dom.healthFill.style.width = `${healthPercent}%`;
 
         // Boost/stamina bar
         const boostPercent = (player.boostStamina / player.maxBoostStamina) * 100;
-        dom.boostFill.style.width = `${boostPercent}%`;
+        if (this.dom.boostFill) this.dom.boostFill.style.width = `${boostPercent}%`;
 
         // Speed conversion (speed * 15 km/h for gamer feeling)
         const currentSpeed = Math.round(Math.sqrt(player.vel.x * player.vel.x + player.vel.y * player.vel.y) * 15);
-        dom.speedVal.innerText = currentSpeed;
+        if (this.dom.speedVal) this.dom.speedVal.innerText = currentSpeed;
 
         // Damage Multiplier based on current velocity along lance direction
-        // In the HUD we'll show potential damage multiplier relative to base speed (approx max player speed)
         const speedRatio = Math.sqrt(player.vel.x * player.vel.x + player.vel.y * player.vel.y) / player.baseMaxSpeed;
         
         // Show current potential multiplier (1.0 to 10.0x)
-        const multiplier = Math.max(1.0, 1.0 + speedRatio * 4.0); // e.g. 5x potential on full charge
+        const multiplier = Math.max(1.0, 1.0 + speedRatio * 4.0);
         const cleanMult = multiplier.toFixed(1);
-        dom.multiplier.innerText = `${cleanMult}x DMG`;
+        if (this.dom.multiplier) this.dom.multiplier.innerText = `${cleanMult}x DMG`;
 
         // Pulse multiplier if speed ratio is high (charging!)
         if (speedRatio > 0.8) {
-            dom.multiplier.classList.add('multiplier-pulse');
+            if (this.dom.multiplier) this.dom.multiplier.classList.add('multiplier-pulse');
         } else {
-            dom.multiplier.classList.remove('multiplier-pulse');
+            if (this.dom.multiplier) this.dom.multiplier.classList.remove('multiplier-pulse');
         }
 
         // Global stats
-        dom.wave.innerText = wave;
-        dom.enemies.innerText = enemiesLeft;
-        dom.gold.innerText = `$${Math.round(gold)}`;
+        if (this.dom.wave) this.dom.wave.innerText = wave;
+        if (this.dom.enemies) this.dom.enemies.innerText = enemiesLeft;
+        if (this.dom.gold) this.dom.gold.innerText = `$${Math.round(gold)}`;
     }
 
     /**
      * Render the Stable Upgrade Shop UI elements
      */
     updateStableShop(gold, upgradeLevels) {
-        const dom = this.getDOM();
-        dom.shopGold.innerText = `$${Math.round(gold)}`;
+        if (this.dom.shopGold) this.dom.shopGold.innerText = `$${Math.round(gold)}`;
 
         Object.keys(this.upgradeConfig).forEach(type => {
             const config = this.upgradeConfig[type];
@@ -277,82 +279,84 @@ export class UIManager {
 
             // DOM Elements inside the card
             const card = document.querySelector(`.upgrade-card[data-upgrade="${type}"]`);
+            if (!card) return;
+            
             const levelEl = document.getElementById(`lvl-${type}`);
             const barEl = document.getElementById(`bar-${type}`);
             const costEl = document.getElementById(`cost-${type}`);
             const btnEl = card.querySelector('.btn-buy');
 
             if (currentLevel >= maxLvl) {
-                levelEl.innerText = "MAX";
-                barEl.style.width = "100%";
-                costEl.innerText = "MAX LEVEL";
-                btnEl.innerText = "MAXED";
-                btnEl.classList.add('maxed');
-                btnEl.disabled = true;
+                if (levelEl) levelEl.innerText = "MAX";
+                if (barEl) barEl.style.width = "100%";
+                if (costEl) costEl.innerText = "MAX LEVEL";
+                if (btnEl) {
+                    btnEl.innerText = "MAXED";
+                    btnEl.classList.add('maxed');
+                    btnEl.disabled = true;
+                }
             } else {
                 const cost = Math.round(config.baseCost * Math.pow(config.costMult, currentLevel));
-                levelEl.innerText = `Lvl ${currentLevel + 1}`;
+                if (levelEl) levelEl.innerText = `Lvl ${currentLevel + 1}`;
                 
                 // Progress bar fill (level / maxLevel * 100)
                 const percent = (currentLevel / maxLvl) * 100;
-                barEl.style.width = `${percent}%`;
-                costEl.innerText = `$${cost}`;
+                if (barEl) barEl.style.width = `${percent}%`;
+                if (costEl) costEl.innerText = `$${cost}`;
                 
                 // Enable or disable buy button
-                btnEl.innerText = "UPGRADE";
-                btnEl.classList.remove('maxed');
-                if (gold >= cost) {
-                    btnEl.disabled = false;
-                    btnEl.style.opacity = '1';
-                } else {
-                    btnEl.disabled = true;
-                    btnEl.style.opacity = '0.5';
+                if (btnEl) {
+                    btnEl.innerText = "UPGRADE";
+                    btnEl.classList.remove('maxed');
+                    if (gold >= cost) {
+                        btnEl.disabled = false;
+                        btnEl.style.opacity = '1';
+                    } else {
+                        btnEl.disabled = true;
+                        btnEl.style.opacity = '0.5';
+                    }
                 }
             }
         });
     }
 
     showWaveClear(wave, loot) {
-        const dom = this.getDOM();
-        dom.waveClearNum.innerText = wave;
-        dom.waveClearLoot.innerText = `$${loot}`;
+        if (this.dom.waveClearNum) this.dom.waveClearNum.innerText = wave;
+        if (this.dom.waveClearLoot) this.dom.waveClearLoot.innerText = `$${loot}`;
         this.showOverlay('waveClear');
     }
 
     showGameOver(wavesSurvived, maxSpeed, maxDmg) {
-        const dom = this.getDOM();
-        dom.goWaves.innerText = wavesSurvived;
-        dom.goMaxSpeed.innerText = `${Math.round(maxSpeed * 15)} km/h`;
-        dom.goMaxDmg.innerText = `${Math.round(maxDmg)} DMG`;
+        if (this.dom.goWaves) this.dom.goWaves.innerText = wavesSurvived;
+        if (this.dom.goMaxSpeed) this.dom.goMaxSpeed.innerText = `${Math.round(maxSpeed * 15)} km/h`;
+        if (this.dom.goMaxDmg) this.dom.goMaxDmg.innerText = `${Math.round(maxDmg)} DMG`;
         this.showOverlay('gameOver');
     }
 
     showVictory() {
-        const dom = this.getDOM();
-        dom.goWaves.innerText = '—';
-        dom.goMaxSpeed.innerText = '—';
-        dom.goMaxDmg.innerText = '—';
-        const heading = dom.gameOverMenu.querySelector('h2');
+        if (this.dom.goWaves) this.dom.goWaves.innerText = '—';
+        if (this.dom.goMaxSpeed) this.dom.goMaxSpeed.innerText = '—';
+        if (this.dom.goMaxDmg) this.dom.goMaxDmg.innerText = '—';
+        const heading = this.dom.gameOverMenu.querySelector('h2');
         if (heading) {
             heading.className = 'text-gold animate-bounce';
             heading.innerText = 'VICTORY!';
         }
-        const desc = dom.gameOverMenu.querySelector('p');
+        const desc = this.dom.gameOverMenu.querySelector('p');
         if (desc) desc.innerText = 'You unhorsed your opponent! Well jousted, knight.';
         this.showOverlay('gameOver');
     }
 
     showOnlineDisconnected() {
-        const dom = this.getDOM();
-        dom.goWaves.innerText = '—';
-        dom.goMaxSpeed.innerText = '—';
-        dom.goMaxDmg.innerText = '—';
-        const heading = dom.gameOverMenu.querySelector('h2');
+        if (this.dom.goWaves) this.dom.goWaves.innerText = '—';
+        if (this.dom.goMaxSpeed) this.dom.goMaxSpeed.innerText = '—';
+        if (this.dom.goMaxDmg) this.dom.goMaxDmg.innerText = '—';
+        const heading = this.dom.gameOverMenu.querySelector('h2');
         if (heading) {
             heading.className = 'text-red';
             heading.innerText = 'DISCONNECTED';
         }
-        const desc = dom.gameOverMenu.querySelector('p');
+        const desc = this.dom.gameOverMenu.querySelector('p');
         if (desc) desc.innerText = 'Opponent left the arena.';
         this.showOverlay('gameOver');
     }
