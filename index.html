@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jet Jousting - High Velocity Arena Combat</title>
+    <meta name="description" content="Jet Jousting - The faster you ride, the harder they fall. A high-velocity arena jousting game.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="index.css">
+</head>
+<body>
+    <div id="game-container">
+        <!-- The Game Canvas -->
+        <canvas id="game-canvas"></canvas>
+
+        <!-- Dynamic Speed Lines Canvas Overlay for speed sensation -->
+        <canvas id="fx-canvas"></canvas>
+
+        <!-- HUD (Heads-Up Display) -->
+        <div id="hud" class="hidden">
+            <div class="hud-left">
+                <div class="hud-stat-container">
+                    <span class="hud-label">STEED HEALTH</span>
+                    <div class="hud-bar-bg health-bg">
+                        <div id="hud-health" class="hud-bar-fill health-fill" style="width: 100%;"></div>
+                    </div>
+                </div>
+                <div class="hud-stat-container">
+                    <span class="hud-label">BOOST STAMINA</span>
+                    <div class="hud-bar-bg boost-bg">
+                        <div id="hud-boost" class="hud-bar-fill boost-fill" style="width: 100%;"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="hud-center">
+                <div id="hud-speed-gauge">
+                    <span id="hud-speed-val">0</span>
+                    <span class="hud-speed-unit">KM/H</span>
+                </div>
+                <div id="hud-multiplier">1.0x DMG</div>
+            </div>
+
+            <div class="hud-right">
+                <div class="hud-info">
+                    <div class="hud-info-item">
+                        <span class="hud-label">WAVE</span>
+                        <span id="hud-wave" class="hud-value text-gold">1</span>
+                    </div>
+                    <div class="hud-info-item">
+                        <span class="hud-label">ENEMIES</span>
+                        <span id="hud-enemies" class="hud-value text-red">0</span>
+                    </div>
+                    <div class="hud-info-item">
+                        <span class="hud-label">GOLD</span>
+                        <span id="hud-gold" class="hud-value text-gold">$0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MAIN MENU -->
+        <div id="main-menu" class="overlay">
+            <div class="menu-content glassmorphism">
+                <h1 class="game-title">JET<span class="text-gold">JOUSTING</span></h1>
+                <p class="game-tagline">The faster you ride, the harder they fall.</p>
+                
+                <div class="instructions-panel">
+                    <h3>HOW TO JOUST:</h3>
+                    <ul>
+                        <li><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> or <span class="key">Arrows</span> to ride & steer your steed.</li>
+                        <li>Move the <span class="key-mouse">Mouse</span> to aim your lance 360°.</li>
+                        <li>Hold <span class="key">Spacebar</span> or <span class="key-mouse">Left Click</span> to Charge (Boost).</li>
+                        <li>Strike enemies with your <strong>lance tip</strong>. Damage depends entirely on your <strong>relative speed</strong> at the point of impact!</li>
+                    </ul>
+                </div>
+
+                <div class="menu-actions">
+                    <button id="btn-start" class="btn btn-primary btn-glow">ENTER ARENA</button>
+                    <button id="btn-stable-main" class="btn btn-secondary">THE ROYAL STABLES</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- THE ROYAL STABLES (UPGRADE SHOP) -->
+        <div id="stable-menu" class="overlay hidden">
+            <div class="menu-content glassmorphism stable-content">
+                <div class="stable-header">
+                    <h2>THE JET <span class="text-gold">STABLES</span></h2>
+                    <div class="gold-display">GOLD: <span id="shop-gold" class="text-gold">$0</span></div>
+                </div>
+                <p class="stable-desc">Upgrade your equipment and steed before charging back into combat.</p>
+
+                <div class="upgrades-list">
+                    <!-- Speed Upgrade -->
+                    <div class="upgrade-card" data-upgrade="speed">
+                        <div class="upgrade-info">
+                            <div>
+                                <span class="upgrade-name">WARHORSE BREEDING (SPEED)</span>
+                                <span class="upgrade-desc">Increases acceleration and maximum charge velocity.</span>
+                            </div>
+                            <span class="upgrade-level" id="lvl-speed">Lvl 1</span>
+                        </div>
+                        <div class="upgrade-bar-container">
+                            <div class="upgrade-bar" id="bar-speed" style="width: 20%;"></div>
+                        </div>
+                        <div class="upgrade-action">
+                            <span class="upgrade-cost" id="cost-speed">$100</span>
+                            <button class="btn btn-upgrade btn-buy" data-upgrade="speed">UPGRADE</button>
+                        </div>
+                    </div>
+
+                    <!-- Armor/Mass Upgrade -->
+                    <div class="upgrade-card" data-upgrade="armor">
+                        <div class="upgrade-info">
+                            <div>
+                                <span class="upgrade-name">PLATE ARMOR (MASS & DEFENSE)</span>
+                                <span class="upgrade-desc">Reduces damage taken and increases enemy knockback.</span>
+                            </div>
+                            <span class="upgrade-level" id="lvl-armor">Lvl 1</span>
+                        </div>
+                        <div class="upgrade-bar-container">
+                            <div class="upgrade-bar" id="bar-armor" style="width: 20%;"></div>
+                        </div>
+                        <div class="upgrade-action">
+                            <span class="upgrade-cost" id="cost-armor">$120</span>
+                            <button class="btn btn-upgrade btn-buy" data-upgrade="armor">UPGRADE</button>
+                        </div>
+                    </div>
+
+                    <!-- Lance Length Upgrade -->
+                    <div class="upgrade-card" data-upgrade="lance">
+                        <div class="upgrade-info">
+                            <div>
+                                <span class="upgrade-name">REINFORCED LANCE (LENGTH)</span>
+                                <span class="upgrade-desc">Extends spear reach to strike opponents from further away.</span>
+                            </div>
+                            <span class="upgrade-level" id="lvl-lance">Lvl 1</span>
+                        </div>
+                        <div class="upgrade-bar-container">
+                            <div class="upgrade-bar" id="bar-lance" style="width: 20%;"></div>
+                        </div>
+                        <div class="upgrade-action">
+                            <span class="upgrade-cost" id="cost-lance">$150</span>
+                            <button class="btn btn-upgrade btn-buy" data-upgrade="lance">UPGRADE</button>
+                        </div>
+                    </div>
+
+                    <!-- Lance Sharpness Upgrade -->
+                    <div class="upgrade-card" data-upgrade="sharpness">
+                        <div class="upgrade-info">
+                            <div>
+                                <span class="upgrade-name">STEEL TIP (BASE DAMAGE)</span>
+                                <span class="upgrade-desc">Increases base impact damage and critical hit scaling.</span>
+                            </div>
+                            <span class="upgrade-level" id="lvl-sharpness">Lvl 1</span>
+                        </div>
+                        <div class="upgrade-bar-container">
+                            <div class="upgrade-bar" id="bar-sharpness" style="width: 20%;"></div>
+                        </div>
+                        <div class="upgrade-action">
+                            <span class="upgrade-cost" id="cost-sharpness">$100</span>
+                            <button class="btn btn-upgrade btn-buy" data-upgrade="sharpness">UPGRADE</button>
+                        </div>
+                    </div>
+
+                    <!-- Boost Stamina Upgrade -->
+                    <div class="upgrade-card" data-upgrade="boost">
+                        <div class="upgrade-info">
+                            <div>
+                                <span class="upgrade-name">HORSE ENDURANCE (BOOST STAMINA)</span>
+                                <span class="upgrade-desc">Increases boost charge capacity and recharge speed.</span>
+                            </div>
+                            <span class="upgrade-level" id="lvl-boost">Lvl 1</span>
+                        </div>
+                        <div class="upgrade-bar-container">
+                            <div class="upgrade-bar" id="bar-boost" style="width: 20%;"></div>
+                        </div>
+                        <div class="upgrade-action">
+                            <span class="upgrade-cost" id="cost-boost">$80</span>
+                            <button class="btn btn-upgrade btn-buy" data-upgrade="boost">UPGRADE</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="menu-actions">
+                    <button id="btn-stable-back" class="btn btn-secondary">BACK TO MENU</button>
+                    <button id="btn-stable-start" class="btn btn-primary btn-glow">START JOUST</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- WAVE CLEAR OVERLAY -->
+        <div id="wave-clear-menu" class="overlay hidden">
+            <div class="menu-content glassmorphism text-center">
+                <h2 class="text-gold animate-bounce">WAVE CLEAR!</h2>
+                <p id="wave-clear-details">You survived Wave <span id="wave-clear-num">1</span> and looted <span class="text-gold" id="wave-clear-loot">$150</span>.</p>
+                <div class="menu-actions">
+                    <button id="btn-next-wave" class="btn btn-primary btn-glow">NEXT WAVE</button>
+                    <button id="btn-stable-loot" class="btn btn-secondary">VISIT STABLES</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- GAME OVER OVERLAY -->
+        <div id="game-over-menu" class="overlay hidden">
+            <div class="menu-content glassmorphism text-center">
+                <h2 class="text-red">DEFEATED!</h2>
+                <p>Your steed has fallen. You survived <span class="text-gold" id="go-waves">0</span> waves.</p>
+                <div class="go-stats">
+                    <div>Max Speed Reached: <span id="go-max-speed" class="text-gold">0 km/h</span></div>
+                    <div>Highest Damage Dealt: <span id="go-max-dmg" class="text-red">0 DMG</span></div>
+                </div>
+                <div class="menu-actions">
+                    <button id="btn-retry" class="btn btn-primary btn-glow">JOUST AGAIN</button>
+                    <button id="btn-stable-go" class="btn btn-secondary">VISIT STABLES</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ES6 Module imports -->
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>

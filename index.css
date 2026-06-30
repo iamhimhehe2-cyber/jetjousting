@@ -1,0 +1,581 @@
+/* Modern dark fantasy medieval UI theme */
+
+:root {
+    --bg-dark: #0d0f12;
+    --panel-bg: rgba(20, 24, 30, 0.75);
+    --border-color: rgba(212, 175, 55, 0.35); /* Pale Gold */
+    --gold: #ffd700;
+    --gold-glow: rgba(255, 215, 0, 0.4);
+    --gold-dark: #b8860b;
+    --red: #ff3e3e;
+    --red-glow: rgba(255, 62, 62, 0.4);
+    --blue: #3a86ff;
+    --blue-glow: rgba(58, 134, 255, 0.4);
+    --text-light: #f4f5f6;
+    --text-muted: #8a929e;
+    --font-heading: 'Outfit', sans-serif;
+    --font-body: 'Inter', sans-serif;
+    --border-radius: 12px;
+    --shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+body {
+    background-color: var(--bg-dark);
+    color: var(--text-light);
+    font-family: var(--font-body);
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+}
+
+#game-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+}
+
+#fx-canvas {
+    z-index: 2;
+    pointer-events: none; /* Let clicks pass through to game canvas */
+}
+
+/* Glassmorphism Panels */
+.glassmorphism {
+    background: var(--panel-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+}
+
+/* Overlays */
+.overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: rgba(8, 10, 12, 0.65);
+    opacity: 1;
+    transition: opacity 0.3s ease;
+}
+
+.overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.menu-content {
+    width: 90%;
+    max-width: 600px;
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    animation: slideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.stable-content {
+    max-width: 800px;
+    max-height: 90%;
+}
+
+/* Typography & Titles */
+.game-title {
+    font-family: var(--font-heading);
+    font-size: 3.5rem;
+    font-weight: 900;
+    text-align: center;
+    letter-spacing: 2px;
+    color: var(--text-light);
+    text-shadow: 0 0 20px var(--gold-glow);
+    margin-bottom: -5px;
+}
+
+.game-tagline {
+    font-size: 1.1rem;
+    color: var(--text-muted);
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+h2 {
+    font-family: var(--font-heading);
+    font-size: 2.2rem;
+    font-weight: 800;
+    letter-spacing: 1px;
+}
+
+h3 {
+    font-family: var(--font-heading);
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: var(--gold);
+    margin-bottom: 12px;
+}
+
+.text-gold {
+    color: var(--gold);
+    text-shadow: 0 0 8px var(--gold-glow);
+}
+
+.text-red {
+    color: var(--red);
+    text-shadow: 0 0 8px var(--red-glow);
+}
+
+.text-center {
+    text-align: center;
+}
+
+/* Instructions Panel */
+.instructions-panel {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    padding: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.instructions-panel ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.instructions-panel li {
+    font-size: 0.95rem;
+    color: var(--text-light);
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    line-height: 1.5;
+}
+
+/* Keyboard Keys styling */
+.key {
+    background: #1e222b;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-bottom: 3px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-family: monospace;
+    font-weight: bold;
+    font-size: 0.85rem;
+    color: var(--gold);
+}
+
+.key-mouse {
+    background: #1e222b;
+    border: 1px solid var(--border-color);
+    border-bottom: 3px solid var(--gold-dark);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 0.85rem;
+    color: var(--text-light);
+    font-weight: bold;
+}
+
+/* Buttons */
+.btn {
+    font-family: var(--font-heading);
+    font-size: 1.1rem;
+    font-weight: 700;
+    padding: 12px 28px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dark) 100%);
+    color: #000;
+    box-shadow: 0 4px 15px rgba(255, 215, 0, 0.2);
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px var(--gold-glow);
+}
+
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-light);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--gold);
+}
+
+.btn-glow:hover {
+    box-shadow: 0 0 25px var(--gold);
+}
+
+.menu-actions {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 10px;
+}
+
+/* Stables / Upgrade Shop UI */
+.stable-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 15px;
+}
+
+.gold-display {
+    font-family: var(--font-heading);
+    font-size: 1.5rem;
+    font-weight: 900;
+}
+
+.stable-desc {
+    font-size: 0.95rem;
+    color: var(--text-muted);
+    margin-top: -8px;
+}
+
+.upgrades-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 8px;
+}
+
+/* Custom Scrollbar */
+.upgrades-list::-webkit-scrollbar {
+    width: 6px;
+}
+.upgrades-list::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 3px;
+}
+.upgrades-list::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 3px;
+}
+
+.upgrade-card {
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    transition: border-color 0.2s ease;
+}
+
+.upgrade-card:hover {
+    border-color: rgba(212, 175, 55, 0.2);
+}
+
+.upgrade-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.upgrade-name {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--text-light);
+    display: block;
+}
+
+.upgrade-desc {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+    display: block;
+}
+
+.upgrade-level {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    color: var(--gold);
+    background: rgba(255, 215, 0, 0.1);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    border: 1px solid rgba(255, 215, 0, 0.2);
+}
+
+.upgrade-bar-container {
+    background: rgba(255, 255, 255, 0.05);
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.upgrade-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--gold-dark) 0%, var(--gold) 100%);
+    border-radius: 4px;
+    width: 0%;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.upgrade-action {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.upgrade-cost {
+    font-family: var(--font-heading);
+    font-weight: 800;
+    font-size: 1.1rem;
+    color: var(--gold);
+}
+
+.btn-upgrade {
+    padding: 6px 16px;
+    font-size: 0.85rem;
+}
+
+.btn-upgrade.maxed {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    color: var(--text-muted) !important;
+    pointer-events: none;
+    box-shadow: none !important;
+    transform: none !important;
+}
+
+/* HUD Overlay */
+#hud {
+    position: absolute;
+    top: 20px;
+    left: 2%;
+    width: 96%;
+    z-index: 5;
+    padding: 15px 25px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(13, 15, 18, 0.65);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: var(--shadow);
+    transition: transform 0.4s ease, opacity 0.4s ease;
+}
+
+#hud.hidden {
+    transform: translateY(-50px);
+    opacity: 0;
+    pointer-events: none;
+}
+
+.hud-left {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 25%;
+}
+
+.hud-stat-container {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.hud-label {
+    font-size: 0.7rem;
+    font-weight: bold;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+}
+
+.hud-bar-bg {
+    background: rgba(255, 255, 255, 0.05);
+    height: 10px;
+    border-radius: 5px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.hud-bar-fill {
+    height: 100%;
+    width: 0%;
+    transition: width 0.1s linear;
+}
+
+.health-fill {
+    background: linear-gradient(90deg, #d32f2f 0%, var(--red) 100%);
+    box-shadow: 0 0 10px var(--red-glow);
+}
+
+.boost-fill {
+    background: linear-gradient(90deg, #1976d2 0%, var(--blue) 100%);
+    box-shadow: 0 0 10px var(--blue-glow);
+}
+
+/* Center HUD Speedometer */
+.hud-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 30%;
+}
+
+#hud-speed-gauge {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 2px;
+}
+
+#hud-speed-val {
+    font-family: var(--font-heading);
+    font-size: 2.5rem;
+    font-weight: 900;
+    color: var(--text-light);
+    text-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+}
+
+.hud-speed-unit {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    font-weight: bold;
+}
+
+#hud-multiplier {
+    font-family: var(--font-heading);
+    font-size: 0.95rem;
+    font-weight: bold;
+    color: var(--gold);
+    background: rgba(255, 215, 0, 0.12);
+    border: 1px solid rgba(255, 215, 0, 0.2);
+    padding: 2px 10px;
+    border-radius: 20px;
+    margin-top: 4px;
+    letter-spacing: 0.5px;
+    transition: transform 0.1s ease;
+}
+
+.multiplier-pulse {
+    transform: scale(1.15);
+    background: rgba(255, 215, 0, 0.3) !important;
+}
+
+/* Right HUD Stats */
+.hud-right {
+    width: 35%;
+}
+
+.hud-info {
+    display: flex;
+    justify-content: flex-end;
+    gap: 30px;
+}
+
+.hud-info-item {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.hud-value {
+    font-family: var(--font-heading);
+    font-size: 1.4rem;
+    font-weight: 800;
+}
+
+/* Game Over Stats list */
+.go-stats {
+    background: rgba(0, 0, 0, 0.2);
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    justify-content: space-around;
+    font-size: 1rem;
+    font-weight: bold;
+    margin: 5px 0;
+}
+
+/* Screen shake effect container modifier */
+.shake-active {
+    animation: canvasShake 0.15s infinite;
+}
+
+/* Animations */
+@keyframes slideIn {
+    from {
+        transform: translateY(30px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes bounce {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-8px);
+    }
+}
+
+.animate-bounce {
+    animation: bounce 2s infinite ease-in-out;
+}
+
+@keyframes canvasShake {
+    0% { transform: translate(1px, 1px) rotate(0deg); }
+    10% { transform: translate(-1px, -2px) rotate(-1deg); }
+    20% { transform: translate(-3px, 0px) rotate(1deg); }
+    30% { transform: translate(0px, 2px) rotate(0deg); }
+    40% { transform: translate(1px, -1px) rotate(1deg); }
+    50% { transform: translate(-1px, 2px) rotate(-1deg); }
+    60% { transform: translate(-3px, 1px) rotate(0deg); }
+    70% { transform: translate(2px, 1px) rotate(-1deg); }
+    80% { transform: translate(-1px, -1px) rotate(1deg); }
+    90% { transform: translate(2px, 2px) rotate(0deg); }
+    100% { transform: translate(1px, -2px) rotate(-1deg); }
+}
