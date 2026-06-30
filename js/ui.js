@@ -360,3 +360,4 @@ export class UIManager {
         if (desc) desc.innerText = 'Opponent left the arena.';
         this.showOverlay('gameOver');
     }
+}
