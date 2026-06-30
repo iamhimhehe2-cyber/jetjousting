@@ -47,6 +47,7 @@ export class NetworkManager {
 
             // Wait for guest to connect
             this.peer.on('connection', (conn) => {
+                console.log('[Net] Guest connecting...');
                 this.conn = conn;
                 this._setupConnection(conn);
             });
@@ -110,7 +111,7 @@ export class NetworkManager {
         this.remoteReady = false;
     }
 
-    // ─── Internal ─────────────────────────────────────────────────────────────
+    // ─── Internal ──────────────────────────────────────────────────────────────
     _setupConnection(conn) {
         conn.on('open', () => {
             this.connected = true;
@@ -139,12 +140,14 @@ export class NetworkManager {
 
         conn.on('close', () => {
             this.connected = false;
+            this.remoteReady = false;
             console.log('[Net] Connection closed');
             if (this.onDisconnected) this.onDisconnected();
         });
 
         conn.on('error', (err) => {
             console.error('[Net] Connection error:', err);
+            this.connected = false;
             if (this.onError) this.onError('Connection dropped: ' + err.message);
         });
     }
