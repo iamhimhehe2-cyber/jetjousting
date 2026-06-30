@@ -3,7 +3,7 @@
 export class UIManager {
     constructor(callbacks = {}) {
         this.callbacks = callbacks;
-        this.dom = {};
+        this.dom = null; // Will be lazy-loaded
         
         // Upgrade costs & max levels definitions
         this.upgradeConfig = {
@@ -22,168 +22,176 @@ export class UIManager {
         // Last speed multiplier for pulsing
         this.lastDmgMult = 1.0;
 
-        // Initialize DOM elements once document is ready
-        this.cacheDOM();
+        // Initialize after DOM is ready
         this.initEventListeners();
     }
 
-    cacheDOM() {
-        // Cache DOM elements
-        this.dom = {
-            container: document.getElementById('game-container'),
-            hud: document.getElementById('hud'),
-            healthFill: document.getElementById('hud-health'),
-            boostFill: document.getElementById('hud-boost'),
-            speedVal: document.getElementById('hud-speed-val'),
-            multiplier: document.getElementById('hud-multiplier'),
-            wave: document.getElementById('hud-wave'),
-            enemies: document.getElementById('hud-enemies'),
-            gold: document.getElementById('hud-gold'),
-            
-            // Overlays
-            mainMenu: document.getElementById('main-menu'),
-            stableMenu: document.getElementById('stable-menu'),
-            waveClearMenu: document.getElementById('wave-clear-menu'),
-            gameOverMenu: document.getElementById('game-over-menu'),
-            onlineMenu: document.getElementById('online-menu'),
-            
-            // Buttons
-            btnStart: document.getElementById('btn-start'),
-            btnOnline: document.getElementById('btn-online'),
-            btnStableMain: document.getElementById('btn-stable-main'),
-            btnStableBack: document.getElementById('btn-stable-back'),
-            btnStableStart: document.getElementById('btn-stable-start'),
-            btnStableLoot: document.getElementById('btn-stable-loot'),
-            btnStableGo: document.getElementById('btn-stable-go'),
-            btnNextWave: document.getElementById('btn-next-wave'),
-            btnRetry: document.getElementById('btn-retry'),
-            
-            // Shop Details
-            shopGold: document.getElementById('shop-gold'),
-            waveClearNum: document.getElementById('wave-clear-num'),
-            waveClearLoot: document.getElementById('wave-clear-loot'),
-            goWaves: document.getElementById('go-waves'),
-            goMaxSpeed: document.getElementById('go-max-speed'),
-            goMaxDmg: document.getElementById('go-max-dmg')
-        };
+    getDOM() {
+        // Lazy load DOM elements on first access
+        if (!this.dom) {
+            this.dom = {
+                container: document.getElementById('game-container'),
+                hud: document.getElementById('hud'),
+                healthFill: document.getElementById('hud-health'),
+                boostFill: document.getElementById('hud-boost'),
+                speedVal: document.getElementById('hud-speed-val'),
+                multiplier: document.getElementById('hud-multiplier'),
+                wave: document.getElementById('hud-wave'),
+                enemies: document.getElementById('hud-enemies'),
+                gold: document.getElementById('hud-gold'),
+                
+                // Overlays
+                mainMenu: document.getElementById('main-menu'),
+                stableMenu: document.getElementById('stable-menu'),
+                waveClearMenu: document.getElementById('wave-clear-menu'),
+                gameOverMenu: document.getElementById('game-over-menu'),
+                onlineMenu: document.getElementById('online-menu'),
+                
+                // Buttons
+                btnStart: document.getElementById('btn-start'),
+                btnOnline: document.getElementById('btn-online'),
+                btnStableMain: document.getElementById('btn-stable-main'),
+                btnStableBack: document.getElementById('btn-stable-back'),
+                btnStableStart: document.getElementById('btn-stable-start'),
+                btnStableLoot: document.getElementById('btn-stable-loot'),
+                btnStableGo: document.getElementById('btn-stable-go'),
+                btnNextWave: document.getElementById('btn-next-wave'),
+                btnRetry: document.getElementById('btn-retry'),
+                
+                // Shop Details
+                shopGold: document.getElementById('shop-gold'),
+                waveClearNum: document.getElementById('wave-clear-num'),
+                waveClearLoot: document.getElementById('wave-clear-loot'),
+                goWaves: document.getElementById('go-waves'),
+                goMaxSpeed: document.getElementById('go-max-speed'),
+                goMaxDmg: document.getElementById('go-max-dmg')
+            };
+        }
+        return this.dom;
     }
 
     initEventListeners() {
-        const blurActive = () => {
-            if (document.activeElement && typeof document.activeElement.blur === 'function') {
-                document.activeElement.blur();
+        // Use setTimeout to ensure DOM is ready
+        setTimeout(() => {
+            const dom = this.getDOM();
+            const blurActive = () => {
+                if (document.activeElement && typeof document.activeElement.blur === 'function') {
+                    document.activeElement.blur();
+                }
+            };
+
+            // Main Menu
+            if (dom.btnStart) {
+                dom.btnStart.addEventListener('click', () => {
+                    blurActive();
+                    this.callbacks.onStartGame();
+                });
             }
-        };
+            
+            if (dom.btnOnline) {
+                dom.btnOnline.addEventListener('click', () => {
+                    blurActive();
+                    this.showOverlay('online');
+                });
+            }
+            
+            if (dom.btnStableMain) {
+                dom.btnStableMain.addEventListener('click', () => {
+                    blurActive();
+                    this.showOverlay('stable');
+                });
+            }
+            
+            // Stable Menu (Upgrade Shop)
+            if (dom.btnStableBack) {
+                dom.btnStableBack.addEventListener('click', () => {
+                    blurActive();
+                    this.showOverlay('main');
+                });
+            }
+            
+            if (dom.btnStableStart) {
+                dom.btnStableStart.addEventListener('click', () => {
+                    blurActive();
+                    this.callbacks.onStartGame();
+                });
+            }
+            
+            // Wave Clear
+            if (dom.btnNextWave) {
+                dom.btnNextWave.addEventListener('click', () => {
+                    blurActive();
+                    this.callbacks.onNextWave();
+                });
+            }
+            
+            if (dom.btnStableLoot) {
+                dom.btnStableLoot.addEventListener('click', () => {
+                    blurActive();
+                    this.showOverlay('stable');
+                });
+            }
+            
+            // Game Over
+            if (dom.btnRetry) {
+                dom.btnRetry.addEventListener('click', () => {
+                    blurActive();
+                    this.callbacks.onResetGame();
+                });
+            }
+            
+            if (dom.btnStableGo) {
+                dom.btnStableGo.addEventListener('click', () => {
+                    blurActive();
+                    this.showOverlay('stable');
+                });
+            }
 
-        // Main Menu
-        if (this.dom.btnStart) {
-            this.dom.btnStart.addEventListener('click', () => {
-                blurActive();
-                this.callbacks.onStartGame();
+            // Bind all "Upgrade/Buy" buttons in stables
+            const buyButtons = document.querySelectorAll('.btn-buy');
+            buyButtons.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    blurActive();
+                    const type = e.target.getAttribute('data-upgrade');
+                    this.callbacks.onBuyUpgrade(type);
+                });
             });
-        }
-        
-        if (this.dom.btnOnline) {
-            this.dom.btnOnline.addEventListener('click', () => {
-                blurActive();
-                this.showOverlay('online');
-            });
-        }
-        
-        if (this.dom.btnStableMain) {
-            this.dom.btnStableMain.addEventListener('click', () => {
-                blurActive();
-                this.showOverlay('stable');
-            });
-        }
-        
-        // Stable Menu (Upgrade Shop)
-        if (this.dom.btnStableBack) {
-            this.dom.btnStableBack.addEventListener('click', () => {
-                blurActive();
-                this.showOverlay('main');
-            });
-        }
-        
-        if (this.dom.btnStableStart) {
-            this.dom.btnStableStart.addEventListener('click', () => {
-                blurActive();
-                this.callbacks.onStartGame();
-            });
-        }
-        
-        // Wave Clear
-        if (this.dom.btnNextWave) {
-            this.dom.btnNextWave.addEventListener('click', () => {
-                blurActive();
-                this.callbacks.onNextWave();
-            });
-        }
-        
-        if (this.dom.btnStableLoot) {
-            this.dom.btnStableLoot.addEventListener('click', () => {
-                blurActive();
-                this.showOverlay('stable');
-            });
-        }
-        
-        // Game Over
-        if (this.dom.btnRetry) {
-            this.dom.btnRetry.addEventListener('click', () => {
-                blurActive();
-                this.callbacks.onResetGame();
-            });
-        }
-        
-        if (this.dom.btnStableGo) {
-            this.dom.btnStableGo.addEventListener('click', () => {
-                blurActive();
-                this.showOverlay('stable');
-            });
-        }
-
-        // Bind all "Upgrade/Buy" buttons in stables
-        const buyButtons = document.querySelectorAll('.btn-buy');
-        buyButtons.forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                blurActive();
-                const type = e.target.getAttribute('data-upgrade');
-                this.callbacks.onBuyUpgrade(type);
-            });
-        });
+        }, 0);
     }
 
     showOverlay(name) {
+        const dom = this.getDOM();
+        
         // Hide all overlays first
-        this.dom.mainMenu.classList.add('hidden');
-        this.dom.stableMenu.classList.add('hidden');
-        this.dom.waveClearMenu.classList.add('hidden');
-        this.dom.gameOverMenu.classList.add('hidden');
-        this.dom.onlineMenu.classList.add('hidden');
-        this.dom.hud.classList.add('hidden');
+        dom.mainMenu.classList.add('hidden');
+        dom.stableMenu.classList.add('hidden');
+        dom.waveClearMenu.classList.add('hidden');
+        dom.gameOverMenu.classList.add('hidden');
+        dom.onlineMenu.classList.add('hidden');
+        dom.hud.classList.add('hidden');
 
         // Stop active screen shake on entering any menu overlay
         if (name !== 'game') {
             this.shakeTime = 0;
             this.shakeIntensity = 0;
             this.shakeOffset = { x: 0, y: 0 };
-            this.dom.container.classList.remove('shake-active');
+            dom.container.classList.remove('shake-active');
         }
 
         // Show requested
         if (name === 'game') {
-            this.dom.hud.classList.remove('hidden');
+            dom.hud.classList.remove('hidden');
         } else if (name === 'main') {
-            this.dom.mainMenu.classList.remove('hidden');
+            dom.mainMenu.classList.remove('hidden');
         } else if (name === 'stable') {
-            this.dom.stableMenu.classList.remove('hidden');
+            dom.stableMenu.classList.remove('hidden');
             this.callbacks.onOpenStable(); // Trigger gold and button update
         } else if (name === 'waveClear') {
-            this.dom.waveClearMenu.classList.remove('hidden');
+            dom.waveClearMenu.classList.remove('hidden');
         } else if (name === 'gameOver') {
-            this.dom.gameOverMenu.classList.remove('hidden');
+            dom.gameOverMenu.classList.remove('hidden');
         } else if (name === 'online') {
-            this.dom.onlineMenu.classList.remove('hidden');
+            dom.onlineMenu.classList.remove('hidden');
         }
     }
 
@@ -196,19 +204,21 @@ export class UIManager {
     }
 
     updateEffects() {
+        const dom = this.getDOM();
+        
         // Process screen shake decay
         if (this.shakeTime > 0) {
             this.shakeOffset.x = (Math.random() - 0.5) * this.shakeIntensity;
             this.shakeOffset.y = (Math.random() - 0.5) * this.shakeIntensity;
             
             // Add visual shake effect class to HTML container to make HUD shake too
-            this.dom.container.classList.add('shake-active');
+            dom.container.classList.add('shake-active');
             
             this.shakeTime--;
             if (this.shakeTime <= 0) {
                 this.shakeOffset.x = 0;
                 this.shakeOffset.y = 0;
-                this.dom.container.classList.remove('shake-active');
+                dom.container.classList.remove('shake-active');
             }
         }
     }
@@ -217,17 +227,19 @@ export class UIManager {
      * Update HUD stats during active game
      */
     updateHUD(player, wave, enemiesLeft, gold) {
+        const dom = this.getDOM();
+        
         // Health bar
         const healthPercent = (player.health / player.maxHealth) * 100;
-        this.dom.healthFill.style.width = `${healthPercent}%`;
+        dom.healthFill.style.width = `${healthPercent}%`;
 
         // Boost/stamina bar
         const boostPercent = (player.boostStamina / player.maxBoostStamina) * 100;
-        this.dom.boostFill.style.width = `${boostPercent}%`;
+        dom.boostFill.style.width = `${boostPercent}%`;
 
         // Speed conversion (speed * 15 km/h for gamer feeling)
         const currentSpeed = Math.round(Math.sqrt(player.vel.x * player.vel.x + player.vel.y * player.vel.y) * 15);
-        this.dom.speedVal.innerText = currentSpeed;
+        dom.speedVal.innerText = currentSpeed;
 
         // Damage Multiplier based on current velocity along lance direction
         // In the HUD we'll show potential damage multiplier relative to base speed (approx max player speed)
@@ -236,26 +248,27 @@ export class UIManager {
         // Show current potential multiplier (1.0 to 10.0x)
         const multiplier = Math.max(1.0, 1.0 + speedRatio * 4.0); // e.g. 5x potential on full charge
         const cleanMult = multiplier.toFixed(1);
-        this.dom.multiplier.innerText = `${cleanMult}x DMG`;
+        dom.multiplier.innerText = `${cleanMult}x DMG`;
 
         // Pulse multiplier if speed ratio is high (charging!)
         if (speedRatio > 0.8) {
-            this.dom.multiplier.classList.add('multiplier-pulse');
+            dom.multiplier.classList.add('multiplier-pulse');
         } else {
-            this.dom.multiplier.classList.remove('multiplier-pulse');
+            dom.multiplier.classList.remove('multiplier-pulse');
         }
 
         // Global stats
-        this.dom.wave.innerText = wave;
-        this.dom.enemies.innerText = enemiesLeft;
-        this.dom.gold.innerText = `$${Math.round(gold)}`;
+        dom.wave.innerText = wave;
+        dom.enemies.innerText = enemiesLeft;
+        dom.gold.innerText = `$${Math.round(gold)}`;
     }
 
     /**
      * Render the Stable Upgrade Shop UI elements
      */
     updateStableShop(gold, upgradeLevels) {
-        this.dom.shopGold.innerText = `$${Math.round(gold)}`;
+        const dom = this.getDOM();
+        dom.shopGold.innerText = `$${Math.round(gold)}`;
 
         Object.keys(this.upgradeConfig).forEach(type => {
             const config = this.upgradeConfig[type];
@@ -300,42 +313,46 @@ export class UIManager {
     }
 
     showWaveClear(wave, loot) {
-        this.dom.waveClearNum.innerText = wave;
-        this.dom.waveClearLoot.innerText = `$${loot}`;
+        const dom = this.getDOM();
+        dom.waveClearNum.innerText = wave;
+        dom.waveClearLoot.innerText = `$${loot}`;
         this.showOverlay('waveClear');
     }
 
     showGameOver(wavesSurvived, maxSpeed, maxDmg) {
-        this.dom.goWaves.innerText = wavesSurvived;
-        this.dom.goMaxSpeed.innerText = `${Math.round(maxSpeed * 15)} km/h`;
-        this.dom.goMaxDmg.innerText = `${Math.round(maxDmg)} DMG`;
+        const dom = this.getDOM();
+        dom.goWaves.innerText = wavesSurvived;
+        dom.goMaxSpeed.innerText = `${Math.round(maxSpeed * 15)} km/h`;
+        dom.goMaxDmg.innerText = `${Math.round(maxDmg)} DMG`;
         this.showOverlay('gameOver');
     }
 
     showVictory() {
-        this.dom.goWaves.innerText = '—';
-        this.dom.goMaxSpeed.innerText = '—';
-        this.dom.goMaxDmg.innerText = '—';
-        const heading = this.dom.gameOverMenu.querySelector('h2');
+        const dom = this.getDOM();
+        dom.goWaves.innerText = '—';
+        dom.goMaxSpeed.innerText = '—';
+        dom.goMaxDmg.innerText = '—';
+        const heading = dom.gameOverMenu.querySelector('h2');
         if (heading) {
             heading.className = 'text-gold animate-bounce';
             heading.innerText = 'VICTORY!';
         }
-        const desc = this.dom.gameOverMenu.querySelector('p');
+        const desc = dom.gameOverMenu.querySelector('p');
         if (desc) desc.innerText = 'You unhorsed your opponent! Well jousted, knight.';
         this.showOverlay('gameOver');
     }
 
     showOnlineDisconnected() {
-        this.dom.goWaves.innerText = '—';
-        this.dom.goMaxSpeed.innerText = '—';
-        this.dom.goMaxDmg.innerText = '—';
-        const heading = this.dom.gameOverMenu.querySelector('h2');
+        const dom = this.getDOM();
+        dom.goWaves.innerText = '—';
+        dom.goMaxSpeed.innerText = '—';
+        dom.goMaxDmg.innerText = '—';
+        const heading = dom.gameOverMenu.querySelector('h2');
         if (heading) {
             heading.className = 'text-red';
             heading.innerText = 'DISCONNECTED';
         }
-        const desc = this.dom.gameOverMenu.querySelector('p');
+        const desc = dom.gameOverMenu.querySelector('p');
         if (desc) desc.innerText = 'Opponent left the arena.';
         this.showOverlay('gameOver');
     }
