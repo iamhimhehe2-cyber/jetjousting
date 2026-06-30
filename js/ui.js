@@ -21,6 +21,7 @@ export class UIManager {
             stableMenu: document.getElementById('stable-menu'),
             waveClearMenu: document.getElementById('wave-clear-menu'),
             gameOverMenu: document.getElementById('game-over-menu'),
+            onlineMenu: document.getElementById('online-menu'),
             
             // Buttons
             btnStart: document.getElementById('btn-start'),
@@ -125,6 +126,7 @@ export class UIManager {
         this.dom.stableMenu.classList.add('hidden');
         this.dom.waveClearMenu.classList.add('hidden');
         this.dom.gameOverMenu.classList.add('hidden');
+        this.dom.onlineMenu.classList.add('hidden');
         this.dom.hud.classList.add('hidden');
 
         // Stop active screen shake on entering any menu overlay
@@ -147,6 +149,8 @@ export class UIManager {
             this.dom.waveClearMenu.classList.remove('hidden');
         } else if (name === 'gameOver') {
             this.dom.gameOverMenu.classList.remove('hidden');
+        } else if (name === 'online') {
+            this.dom.onlineMenu.classList.remove('hidden');
         }
     }
 
@@ -274,4 +278,31 @@ export class UIManager {
         this.dom.goMaxDmg.innerText = `${Math.round(maxDmg)} DMG`;
         this.showOverlay('gameOver');
     }
-}
+
+    showVictory() {
+        this.dom.goWaves.innerText = '—';
+        this.dom.goMaxSpeed.innerText = '—';
+        this.dom.goMaxDmg.innerText = '—';
+        const heading = this.dom.gameOverMenu.querySelector('h2');
+        if (heading) {
+            heading.className = 'text-gold animate-bounce';
+            heading.innerText = 'VICTORY!';
+        }
+        const desc = this.dom.gameOverMenu.querySelector('p');
+        if (desc) desc.innerText = 'You unhorsed your opponent! Well jousted, knight.';
+        this.showOverlay('gameOver');
+    }
+
+    showOnlineDisconnected() {
+        this.dom.goWaves.innerText = '—';
+        this.dom.goMaxSpeed.innerText = '—';
+        this.dom.goMaxDmg.innerText = '—';
+        const heading = this.dom.gameOverMenu.querySelector('h2');
+        if (heading) {
+            heading.className = 'text-red';
+            heading.innerText = 'DISCONNECTED';
+        }
+        const desc = this.dom.gameOverMenu.querySelector('p');
+        if (desc) desc.innerText = 'Opponent left the arena.';
+        this.showOverlay('gameOver');
+    }

@@ -579,3 +579,151 @@ h3 {
     90% { transform: translate(2px, 2px) rotate(0deg); }
     100% { transform: translate(1px, -2px) rotate(-1deg); }
 }
+
+/* ── Online Mode UI ─────────────────────────────────────────────────── */
+
+.btn-online {
+    background: linear-gradient(135deg, #3a86ff 0%, #1d4ed8 100%);
+    color: #fff;
+    box-shadow: 0 4px 15px rgba(58, 134, 255, 0.25);
+}
+
+.btn-online:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 22px rgba(58, 134, 255, 0.55);
+}
+
+.online-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+.online-divider {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    letter-spacing: 3px;
+    margin: 4px 0;
+}
+
+.join-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.room-input {
+    font-family: var(--font-heading);
+    font-size: 1.5rem;
+    font-weight: 900;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    text-align: center;
+    width: 180px;
+    padding: 10px 16px;
+    background: rgba(255,255,255,0.06);
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-light);
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.room-input:focus {
+    border-color: var(--gold);
+}
+
+.room-input::placeholder {
+    color: var(--text-muted);
+    letter-spacing: 3px;
+    font-size: 1rem;
+}
+
+.room-code-display {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: rgba(255, 215, 0, 0.07);
+    border: 1px solid rgba(255, 215, 0, 0.25);
+    border-radius: 10px;
+    padding: 12px 20px;
+}
+
+.room-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+}
+
+.room-code {
+    font-family: 'Courier New', monospace;
+    font-size: 2rem;
+    font-weight: 900;
+    letter-spacing: 8px;
+    color: var(--gold);
+    text-shadow: 0 0 12px var(--gold-glow);
+}
+
+.btn-small {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+}
+
+/* Connection status indicator */
+.online-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.95rem;
+    color: var(--text-muted);
+    padding: 8px 16px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 20px;
+}
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.status-dot.connecting {
+    background: #facc15;
+    animation: pulse-dot 1s infinite;
+}
+
+.status-dot.connected {
+    background: #22c55e;
+    animation: none;
+}
+
+.status-dot.error {
+    background: var(--red);
+    animation: none;
+}
+
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.7); }
+}
+
+.online-ready-desc {
+    text-align: center;
+    font-size: 0.95rem;
+    color: var(--text-muted);
+}
+
+.online-error {
+    color: var(--red);
+    font-size: 0.9rem;
+    text-align: center;
+    background: rgba(255, 62, 62, 0.1);
+    border: 1px solid rgba(255, 62, 62, 0.25);
+    border-radius: 6px;
+    padding: 8px 16px;
+}
+

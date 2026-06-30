@@ -61,7 +61,8 @@ export function updateHorsePhysics(entity, dt, maxSpeed, accelRate, friction) {
         let diff = moveAngle - entity.angle;
         while (diff < -Math.PI) diff += Math.PI * 2;
         while (diff > Math.PI) diff -= Math.PI * 2;
-        entity.angle += diff * 0.15; // Smooth steer interpolation rate
+        // Use entity.turnRate — lower = harder to turn (online mode uses ~0.05)
+        entity.angle += diff * (entity.turnRate || 0.15);
     }
 }
 

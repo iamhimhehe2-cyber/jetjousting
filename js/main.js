@@ -1,9 +1,10 @@
-// Joust Royale: Main entry point, state manager, and game loop.
+// Jet Jousting: Main entry point, state manager, and game loop.
 import { Vector, resolveHorseCollisions, checkLanceStrike } from './physics.js';
 import { audio } from './audio.js';
 import { ParticleSystem } from './particles.js';
 import { Player, Enemy } from './entities.js';
 import { UIManager } from './ui.js';
+import { NetworkManager } from './network.js';
 
 class Game {
     constructor() {
@@ -66,6 +67,13 @@ class Game {
             onBuyUpgrade: (type) => this.buyUpgrade(type)
         });
 
+        // Online multiplayer
+        this.net = new NetworkManager();
+        this.onlineMode = false;
+        this.remotePlayer = null;      // The opponent's rendered entity
+        this.localReady = false;
+        this.remoteReadyFlag = false;
+
         this.initInputListeners();
         this.resizeCanvas();
         window.addEventListener('resize', () => this.resizeCanvas());
@@ -73,6 +81,9 @@ class Game {
         // Start animating
         this.lastTime = 0;
         requestAnimationFrame((t) => this.loop(t));
+
+        // Wire online lobby UI
+        this.initOnlineUI();
     }
 
     resizeCanvas() {
@@ -121,8 +132,9 @@ class Game {
         });
     }
 
-    startGame() {
+    startGame(isOnline = false) {
         this.state = 'playing';
+        this.onlineMode = isOnline;
         this.wave = 1;
         this.gold = 0;
         this.stats.maxSpeed = 0;
@@ -134,11 +146,31 @@ class Game {
 
         // Create player in center
         this.player = new Player(this.arena.width / 2, this.arena.height / 2);
-        
-        // Spawn wave 1
-        this.spawnWave(1);
+
+        if (isOnline) {
+            // In online mode, turning is much harder
+            this.player.turnRate = 0.05;
+
+            // Remote player spawns on opposite side of arena
+            const isHost = this.net.isHost;
+            if (!isHost) {
+                // Guest spawns offset to avoid immediate collision
+                this.player.pos = Vector.create(this.arena.width / 2 - 300, this.arena.height / 2);
+            } else {
+                this.player.pos = Vector.create(this.arena.width / 2 + 300, this.arena.height / 2);
+            }
+
+            // Remote player entity (no AI, driven by network)
+            this.remotePlayer = new RemotePlayer(this.player.pos.x, this.player.pos.y);
+            this.enemies = []; // No AI enemies in online mode
+        } else {
+            this.player.turnRate = 0.15; // Normal singleplayer turning
+            this.remotePlayer = null;
+            // Spawn wave 1
+            this.spawnWave(1);
+        }
+
         this.ui.showOverlay('game');
-        
         this.particles.clear();
         audio.playWhinny();
     }
@@ -257,20 +289,34 @@ class Game {
         this.player.update(dt, this.keys, worldMousePos);
         this.keepInArena(this.player);
 
-        // Update enemies
-        for (let i = this.enemies.length - 1; i >= 0; i--) {
-            const enemy = this.enemies[i];
-            enemy.update(dt, this.player);
-            this.keepInArena(enemy);
-            
-            if (enemy.isDead) {
-                // Give gold bounty
-                const bounty = Math.round(45 + Math.random() * 25 + this.wave * 10);
-                this.gold += bounty;
-                this.particles.spawnText(enemy.pos.x, enemy.pos.y, `+$${bounty}`);
-                audio.playVictory();
-                this.enemies.splice(i, 1);
+        // Update enemies (singleplayer only)
+        if (!this.onlineMode) {
+            for (let i = this.enemies.length - 1; i >= 0; i--) {
+                const enemy = this.enemies[i];
+                enemy.update(dt, this.player);
+                this.keepInArena(enemy);
+
+                if (enemy.isDead) {
+                    const bounty = Math.round(45 + Math.random() * 25 + this.wave * 10);
+                    this.gold += bounty;
+                    this.particles.spawnText(enemy.pos.x, enemy.pos.y, `+$${bounty}`);
+                    audio.playVictory();
+                    this.enemies.splice(i, 1);
+                }
             }
+        }
+
+        // Online: send local state, update remote player
+        if (this.onlineMode && this.net.connected) {
+            this.net.sendState({
+                pos: { x: this.player.pos.x, y: this.player.pos.y },
+                vel: { x: this.player.vel.x, y: this.player.vel.y },
+                angle: this.player.angle,
+                lanceAngle: this.player.lanceAngle,
+                health: this.player.health,
+                boostStamina: this.player.boostStamina,
+                isBoosting: this.player.isBoosting
+            });
         }
 
         // Update particles
@@ -332,13 +378,16 @@ class Game {
             this.state = 'gameover';
             audio.playDefeat();
             this.ui.showGameOver(this.stats.wavesSurvived, this.stats.maxSpeed, this.stats.maxDmgDealt);
-        } else if (this.enemies.length === 0) {
+        } else if (!this.onlineMode && this.enemies.length === 0) {
             this.state = 'waveclear';
             this.stats.wavesSurvived++;
             const waveLoot = 100 + this.wave * 50;
             this.gold += waveLoot;
             audio.playVictory();
             this.ui.showWaveClear(this.wave, waveLoot);
+        } else if (this.onlineMode && this.remotePlayer && this.remotePlayer.isDead) {
+            this.state = 'gameover'; // Reuse screen — winner sees "defeated" from opponent's POV
+            this.ui.showVictory();
         }
     }
 
@@ -363,7 +412,40 @@ class Game {
     }
 
     checkCollisions() {
-        // 1. Resolve Horse-to-Horse Collisions (Bouncing)
+        if (this.onlineMode) {
+            // Online: only check player lance vs remote player
+            if (this.remotePlayer && !this.remotePlayer.isDead) {
+                const strike = checkLanceStrike(this.player, this.remotePlayer);
+                if (strike.collided && strike.impactSpeed > 0.5) {
+                    const multiplier = Math.max(0.5, strike.impactSpeed / 1.5);
+                    const damage = this.player.baseDamage * multiplier;
+                    const isCrit = multiplier > 3.0;
+
+                    // Tell the remote side they took damage
+                    this.net.sendHit(damage);
+
+                    // Also mark locally for visual feedback
+                    this.remotePlayer.flashHit();
+
+                    const knockbackDir = Vector.normalize(this.player.vel);
+                    this.particles.spawnSparks(strike.point.x, strike.point.y, Math.ceil(damage / 2));
+                    this.particles.spawnBlood(strike.point.x, strike.point.y, knockbackDir, multiplier / 3);
+                    this.particles.spawnText(strike.point.x, strike.point.y, damage, isCrit);
+                    audio.playClash(damage);
+
+                    const intensity = Math.min(20, damage / 4);
+                    this.ui.triggerShake(intensity, 12);
+                }
+            }
+
+            // Horse bumping in online (no damage, just push)
+            if (this.remotePlayer) {
+                resolveHorseCollisions(this.player, this.remotePlayer);
+            }
+            return;
+        }
+
+        // Singleplayer collisions:
         for (let i = 0; i < this.enemies.length; i++) {
             resolveHorseCollisions(this.player, this.enemies[i]);
             for (let j = i + 1; j < this.enemies.length; j++) {
@@ -478,7 +560,11 @@ class Game {
 
         // 2. Draw active entities
         this.player.draw(this.ctx);
-        this.enemies.forEach(enemy => enemy.draw(this.ctx));
+        if (this.onlineMode && this.remotePlayer) {
+            this.remotePlayer.draw(this.ctx);
+        } else {
+            this.enemies.forEach(enemy => enemy.draw(this.ctx));
+        }
 
         // 3. Draw particles
         this.particles.draw(this.ctx);
@@ -678,6 +764,275 @@ class Game {
         this.ctx.stroke();
     }
 }
+
+// ─── Remote Player: driven by network data ────────────────────────────────
+class RemotePlayer {
+    constructor(x, y) {
+        this.pos = Vector.create(x, y);
+        this.vel = Vector.create(0, 0);
+        this.angle = 0;
+        this.lanceAngle = 0;
+        this.health = 100;
+        this.maxHealth = 100;
+        this.boostStamina = 100;
+        this.maxBoostStamina = 100;
+        this.isBoosting = false;
+        this.radius = 24;
+        this.mass = 1.2;
+        this.lanceLength = 70;
+        this.lanceWidth = 6;
+        this.isDead = false;
+        this.hitFlashTimer = 0;
+        this.gallopTimer = 0;
+    }
+
+    applyState(data) {
+        // Smooth interpolation of remote position
+        this.pos.x += (data.pos.x - this.pos.x) * 0.35;
+        this.pos.y += (data.pos.y - this.pos.y) * 0.35;
+        this.vel = data.vel;
+        this.angle = data.angle;
+        this.lanceAngle = data.lanceAngle;
+        this.health = data.health;
+        this.maxHealth = this.maxHealth || 100;
+        this.boostStamina = data.boostStamina;
+        this.isBoosting = data.isBoosting;
+        const speed = Math.sqrt(data.vel.x * data.vel.x + data.vel.y * data.vel.y);
+        this.gallopTimer += speed * 0.15;
+
+        if (data.health <= 0) this.isDead = true;
+    }
+
+    flashHit() {
+        this.hitFlashTimer = 10;
+    }
+
+    draw(ctx) {
+        if (this.isDead) return;
+
+        const speed = Math.sqrt(this.vel.x * this.vel.x + this.vel.y * this.vel.y);
+        const isFlashing = this.hitFlashTimer > 0;
+        if (this.hitFlashTimer > 0) this.hitFlashTimer--;
+
+        ctx.save();
+        ctx.translate(this.pos.x, this.pos.y);
+
+        if (isFlashing) {
+            ctx.globalAlpha = 0.5 + Math.random() * 0.5;
+        }
+
+        ctx.rotate(this.angle);
+
+        // Shadow
+        ctx.shadowColor = 'rgba(0,0,0,0.4)';
+        ctx.shadowBlur = 10;
+        ctx.shadowOffsetX = 5;
+        ctx.shadowOffsetY = 8;
+
+        // Galloping legs
+        const legSpread = 12;
+        const gallopSway = Math.sin(this.gallopTimer) * 8 * Math.min(1, speed / 2);
+        ctx.fillStyle = '#1a110a';
+        ctx.fillRect(12, -legSpread + gallopSway, 6, 4);
+        ctx.fillRect(12, legSpread - gallopSway, 6, 4);
+        ctx.fillRect(-16, -legSpread - gallopSway, 6, 4);
+        ctx.fillRect(-16, legSpread + gallopSway, 6, 4);
+
+        ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+
+        // Red enemy horse (opponent color scheme)
+        ctx.fillStyle = '#7f1d1d';
+        ctx.beginPath(); ctx.ellipse(0, 0, 22, 11, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(18, 0, 8, 5, 0, 0, Math.PI * 2); ctx.fill();
+
+        ctx.fillStyle = '#5c3a21';
+        ctx.fillRect(-6, -9, 12, 18);
+
+        // Red armor
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath(); ctx.arc(0, 0, 9, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#7f1d1d';
+        ctx.beginPath(); ctx.arc(2, 0, 5, 0, Math.PI * 2); ctx.fill();
+
+        // Dark plume
+        ctx.fillStyle = '#facc15';
+        ctx.beginPath();
+        ctx.moveTo(-4, 0);
+        ctx.quadraticCurveTo(-15, -4, -18, -2);
+        ctx.quadraticCurveTo(-10, 0, -18, 2);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.restore();
+
+        // Draw lance separately (free rotation)
+        ctx.save();
+        ctx.translate(this.pos.x, this.pos.y);
+        ctx.rotate(this.lanceAngle);
+        const sy = 9;
+        ctx.strokeStyle = '#8B5A2B'; ctx.lineWidth = this.lanceWidth; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(5, sy); ctx.lineTo(this.lanceLength - 12, sy); ctx.stroke();
+        ctx.fillStyle = '#dc2626';
+        ctx.beginPath(); ctx.arc(10, sy, 7, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#e0e0e0'; ctx.fillStyle = '#ffffff'; ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(this.lanceLength - 12, sy - this.lanceWidth / 2);
+        ctx.lineTo(this.lanceLength, sy);
+        ctx.lineTo(this.lanceLength - 12, sy + this.lanceWidth / 2);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.restore();
+
+        // Health bar above remote player
+        const barW = 50;
+        const barH = 6;
+        const barX = this.pos.x - barW / 2;
+        const barY = this.pos.y - 42;
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(barX, barY, barW, barH);
+        const pct = Math.max(0, this.health / this.maxHealth);
+        ctx.fillStyle = pct > 0.5 ? '#22c55e' : pct > 0.25 ? '#facc15' : '#ef4444';
+        ctx.fillRect(barX, barY, barW * pct, barH);
+
+        // "OPPONENT" label
+        ctx.font = "bold 10px 'Outfit', sans-serif";
+        ctx.fillStyle = '#ef4444';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText('OPPONENT', this.pos.x, barY - 2);
+    }
+}
+
+// ─── Online lobby UI wiring ────────────────────────────────────────────────
+
+Game.prototype.initOnlineUI = function() {
+    const $ = id => document.getElementById(id);
+
+    const setStatus = (text, type = 'connecting') => {
+        const s = $('online-status');
+        const dot = $('online-status-icon');
+        const txt = $('online-status-text');
+        s.classList.remove('hidden');
+        dot.className = 'status-dot ' + type;
+        txt.innerText = text;
+    };
+
+    const showError = (msg) => {
+        const el = $('online-error');
+        el.classList.remove('hidden');
+        el.innerText = '⚠ ' + msg;
+    };
+
+    const hideError = () => $('online-error').classList.add('hidden');
+
+    // Open the online lobby from main menu
+    $('btn-online').addEventListener('click', () => {
+        this.ui.showOverlay('online');
+        hideError();
+        $('online-status').classList.add('hidden');
+        $('online-ready-section').classList.add('hidden');
+        $('room-code-display').classList.add('hidden');
+    });
+
+    $('btn-online-back').addEventListener('click', () => {
+        this.net.disconnect();
+        this.ui.showOverlay('main');
+    });
+
+    // HOST: Create room
+    $('btn-host').addEventListener('click', async () => {
+        hideError();
+        $('btn-host').disabled = true;
+        setStatus('Creating room...', 'connecting');
+        try {
+            const code = await this.net.createRoom();
+            $('room-code-text').innerText = code;
+            $('room-code-display').classList.remove('hidden');
+            setStatus('Waiting for opponent...', 'connecting');
+
+            this.net.onConnected = () => {
+                setStatus('Opponent connected!', 'connected');
+                $('online-ready-section').classList.remove('hidden');
+            };
+        } catch (e) {
+            showError(e);
+            $('btn-host').disabled = false;
+        }
+    });
+
+    // Copy room code
+    $('btn-copy-code').addEventListener('click', () => {
+        const code = $('room-code-text').innerText;
+        navigator.clipboard.writeText(code).catch(() => {});
+        $('btn-copy-code').innerText = 'COPIED!';
+        setTimeout(() => { $('btn-copy-code').innerText = 'COPY'; }, 1500);
+    });
+
+    // GUEST: Join room
+    $('btn-join').addEventListener('click', async () => {
+        hideError();
+        const code = $('room-code-input').value.trim().toUpperCase();
+        if (code.length !== 6) { showError('Code must be 6 characters'); return; }
+        $('btn-join').disabled = true;
+        setStatus('Connecting to room...', 'connecting');
+        try {
+            await this.net.joinRoom(code);
+            this.net.onConnected = () => {
+                setStatus('Connected to host!', 'connected');
+                $('online-ready-section').classList.remove('hidden');
+            };
+        } catch (e) {
+            showError(e);
+            $('btn-join').disabled = false;
+        }
+    });
+
+    // READY UP
+    $('btn-online-ready').addEventListener('click', () => {
+        this.localReady = true;
+        $('btn-online-ready').disabled = true;
+        $('btn-online-ready').innerText = 'WAITING FOR OPPONENT...';
+        this.net.sendReady();
+        if (this.net.remoteReady) this._startOnlineGame();
+    });
+
+    this.net.onRemoteReady = () => {
+        this.remoteReadyFlag = true;
+        if (this.localReady) this._startOnlineGame();
+    };
+
+    this.net.onRemoteState = (data) => {
+        if (this.remotePlayer) {
+            this.remotePlayer.applyState(data);
+        }
+    };
+
+    this.net.onRemoteHit = (damage) => {
+        if (!this.player || this.player.isDead) return;
+        const armorReduction = 1 + (this.upgrades.armor || 0) * 0.3;
+        const actualDmg = this.player.takeDamage(damage / armorReduction);
+        if (actualDmg > 0) {
+            audio.playClash(actualDmg);
+            audio.playGrunt();
+            this.particles.spawnText(this.player.pos.x, this.player.pos.y - 30, actualDmg, false);
+            this.ui.triggerShake(Math.min(18, actualDmg / 3), 10);
+        }
+    };
+
+    this.net.onDisconnected = () => {
+        if (this.state === 'playing' && this.onlineMode) {
+            this.state = 'gameover';
+            this.ui.showOnlineDisconnected();
+        }
+    };
+
+    this.net.onError = (msg) => {
+        showError(msg);
+    };
+};
+
+Game.prototype._startOnlineGame = function() {
+    this.startGame(true);
+};
 
 // Start Game system on window load
 window.addEventListener('load', () => {

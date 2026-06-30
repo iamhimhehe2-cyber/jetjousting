@@ -10,6 +10,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="index.css">
+    <!-- PeerJS for WebRTC P2P multiplayer -->
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
 <body>
     <div id="game-container">
@@ -80,12 +82,13 @@
 
                 <div class="menu-actions">
                     <button id="btn-start" class="btn btn-primary btn-glow">ENTER ARENA</button>
-                    <button id="btn-stable-main" class="btn btn-secondary">THE ROYAL STABLES</button>
+                    <button id="btn-online" class="btn btn-online btn-glow">⚡ ONLINE 1v1</button>
+                    <button id="btn-stable-main" class="btn btn-secondary">THE JET STABLES</button>
                 </div>
             </div>
         </div>
 
-        <!-- THE ROYAL STABLES (UPGRADE SHOP) -->
+        <!-- THE JET STABLES (UPGRADE SHOP) -->
         <div id="stable-menu" class="overlay hidden">
             <div class="menu-content glassmorphism stable-content">
                 <div class="stable-header">
@@ -205,7 +208,49 @@
             </div>
         </div>
 
-        <!-- GAME OVER OVERLAY -->
+        <!-- ONLINE LOBBY -->
+        <div id="online-menu" class="overlay hidden">
+            <div class="menu-content glassmorphism">
+                <h2>ONLINE <span class="text-gold">1v1</span></h2>
+                <p class="game-tagline">Lance your friend at high speed. Harder to turn — speed is everything.</p>
+
+                <div id="online-host-section" class="online-section">
+                    <button id="btn-host" class="btn btn-primary">CREATE ROOM</button>
+                    <div id="room-code-display" class="room-code-display hidden">
+                        <span class="room-label">SHARE THIS CODE:</span>
+                        <span id="room-code-text" class="room-code">------</span>
+                        <button id="btn-copy-code" class="btn btn-secondary btn-small">COPY</button>
+                    </div>
+                </div>
+
+                <div class="online-divider">— OR —</div>
+
+                <div id="online-join-section" class="online-section">
+                    <div class="join-row">
+                        <input id="room-code-input" type="text" maxlength="6" placeholder="ENTER CODE" class="room-input" />
+                        <button id="btn-join" class="btn btn-primary">JOIN</button>
+                    </div>
+                </div>
+
+                <div id="online-status" class="online-status hidden">
+                    <div id="online-status-icon" class="status-dot connecting"></div>
+                    <span id="online-status-text">Connecting...</span>
+                </div>
+
+                <div id="online-ready-section" class="online-section hidden">
+                    <p class="online-ready-desc">Opponent connected! <span class="text-gold">Click Ready to start.</span></p>
+                    <button id="btn-online-ready" class="btn btn-primary btn-glow">READY UP ⚡</button>
+                </div>
+
+                <div id="online-error" class="online-error hidden"></div>
+
+                <div class="menu-actions" style="margin-top:10px">
+                    <button id="btn-online-back" class="btn btn-secondary">BACK</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- GAME OVER OVERLAY (online-aware) -->
         <div id="game-over-menu" class="overlay hidden">
             <div class="menu-content glassmorphism text-center">
                 <h2 class="text-red">DEFEATED!</h2>
