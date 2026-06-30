@@ -25,6 +25,7 @@ export class UIManager {
             
             // Buttons
             btnStart: document.getElementById('btn-start'),
+            btnOnline: document.getElementById('btn-online'),
             btnStableMain: document.getElementById('btn-stable-main'),
             btnStableBack: document.getElementById('btn-stable-back'),
             btnStableStart: document.getElementById('btn-stable-start'),
@@ -73,6 +74,10 @@ export class UIManager {
         this.dom.btnStart.addEventListener('click', () => {
             blurActive();
             this.callbacks.onStartGame();
+        });
+        this.dom.btnOnline.addEventListener('click', () => {
+            blurActive();
+            this.showOverlay('online');
         });
         this.dom.btnStableMain.addEventListener('click', () => {
             blurActive();
