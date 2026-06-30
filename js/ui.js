@@ -3,7 +3,31 @@
 export class UIManager {
     constructor(callbacks = {}) {
         this.callbacks = callbacks;
+        this.dom = {};
         
+        // Upgrade costs & max levels definitions
+        this.upgradeConfig = {
+            speed: { baseCost: 100, costMult: 1.6, maxLvl: 5, name: "WARHORSE SPEED" },
+            armor: { baseCost: 120, costMult: 1.7, maxLvl: 5, name: "PLATE ARMOR" },
+            lance: { baseCost: 150, costMult: 1.8, maxLvl: 5, name: "REINFORCED LANCE" },
+            sharpness: { baseCost: 100, costMult: 1.6, maxLvl: 5, name: "STEEL TIP" },
+            boost: { baseCost: 80, costMult: 1.5, maxLvl: 5, name: "HORSE ENDURANCE" }
+        };
+
+        // Screen Shake State
+        this.shakeTime = 0;
+        this.shakeIntensity = 0;
+        this.shakeOffset = { x: 0, y: 0 };
+
+        // Last speed multiplier for pulsing
+        this.lastDmgMult = 1.0;
+
+        // Initialize DOM elements once document is ready
+        this.cacheDOM();
+        this.initEventListeners();
+    }
+
+    cacheDOM() {
         // Cache DOM elements
         this.dom = {
             container: document.getElementById('game-container'),
@@ -42,25 +66,6 @@ export class UIManager {
             goMaxSpeed: document.getElementById('go-max-speed'),
             goMaxDmg: document.getElementById('go-max-dmg')
         };
-
-        // Upgrade costs & max levels definitions
-        this.upgradeConfig = {
-            speed: { baseCost: 100, costMult: 1.6, maxLvl: 5, name: "WARHORSE SPEED" },
-            armor: { baseCost: 120, costMult: 1.7, maxLvl: 5, name: "PLATE ARMOR" },
-            lance: { baseCost: 150, costMult: 1.8, maxLvl: 5, name: "REINFORCED LANCE" },
-            sharpness: { baseCost: 100, costMult: 1.6, maxLvl: 5, name: "STEEL TIP" },
-            boost: { baseCost: 80, costMult: 1.5, maxLvl: 5, name: "HORSE ENDURANCE" }
-        };
-
-        // Screen Shake State
-        this.shakeTime = 0;
-        this.shakeIntensity = 0;
-        this.shakeOffset = { x: 0, y: 0 };
-
-        // Last speed multiplier for pulsing
-        this.lastDmgMult = 1.0;
-
-        this.initEventListeners();
     }
 
     initEventListeners() {
@@ -71,48 +76,71 @@ export class UIManager {
         };
 
         // Main Menu
-        this.dom.btnStart.addEventListener('click', () => {
-            blurActive();
-            this.callbacks.onStartGame();
-        });
-        this.dom.btnOnline.addEventListener('click', () => {
-            blurActive();
-            this.showOverlay('online');
-        });
-        this.dom.btnStableMain.addEventListener('click', () => {
-            blurActive();
-            this.showOverlay('stable');
-        });
+        if (this.dom.btnStart) {
+            this.dom.btnStart.addEventListener('click', () => {
+                blurActive();
+                this.callbacks.onStartGame();
+            });
+        }
+        
+        if (this.dom.btnOnline) {
+            this.dom.btnOnline.addEventListener('click', () => {
+                blurActive();
+                this.showOverlay('online');
+            });
+        }
+        
+        if (this.dom.btnStableMain) {
+            this.dom.btnStableMain.addEventListener('click', () => {
+                blurActive();
+                this.showOverlay('stable');
+            });
+        }
         
         // Stable Menu (Upgrade Shop)
-        this.dom.btnStableBack.addEventListener('click', () => {
-            blurActive();
-            this.showOverlay('main');
-        });
-        this.dom.btnStableStart.addEventListener('click', () => {
-            blurActive();
-            this.callbacks.onStartGame();
-        });
+        if (this.dom.btnStableBack) {
+            this.dom.btnStableBack.addEventListener('click', () => {
+                blurActive();
+                this.showOverlay('main');
+            });
+        }
+        
+        if (this.dom.btnStableStart) {
+            this.dom.btnStableStart.addEventListener('click', () => {
+                blurActive();
+                this.callbacks.onStartGame();
+            });
+        }
         
         // Wave Clear
-        this.dom.btnNextWave.addEventListener('click', () => {
-            blurActive();
-            this.callbacks.onNextWave();
-        });
-        this.dom.btnStableLoot.addEventListener('click', () => {
-            blurActive();
-            this.showOverlay('stable');
-        });
+        if (this.dom.btnNextWave) {
+            this.dom.btnNextWave.addEventListener('click', () => {
+                blurActive();
+                this.callbacks.onNextWave();
+            });
+        }
+        
+        if (this.dom.btnStableLoot) {
+            this.dom.btnStableLoot.addEventListener('click', () => {
+                blurActive();
+                this.showOverlay('stable');
+            });
+        }
         
         // Game Over
-        this.dom.btnRetry.addEventListener('click', () => {
-            blurActive();
-            this.callbacks.onResetGame();
-        });
-        this.dom.btnStableGo.addEventListener('click', () => {
-            blurActive();
-            this.showOverlay('stable');
-        });
+        if (this.dom.btnRetry) {
+            this.dom.btnRetry.addEventListener('click', () => {
+                blurActive();
+                this.callbacks.onResetGame();
+            });
+        }
+        
+        if (this.dom.btnStableGo) {
+            this.dom.btnStableGo.addEventListener('click', () => {
+                blurActive();
+                this.showOverlay('stable');
+            });
+        }
 
         // Bind all "Upgrade/Buy" buttons in stables
         const buyButtons = document.querySelectorAll('.btn-buy');
