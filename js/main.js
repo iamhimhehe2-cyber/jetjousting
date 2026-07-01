@@ -27,7 +27,7 @@ class Game {
         this.wave = 1;
         this.gold = 0;
         
-        // Upgrades Inventory
+        // Upgrades Inventory (PERSISTENT - never reset!)
         this.upgrades = {
             speed: 0,
             armor: 0,
@@ -73,6 +73,9 @@ class Game {
         this.remotePlayer = null;      // The opponent's rendered entity
         this.localReady = false;
         this.remoteReadyFlag = false;
+
+        // Track if we're visiting the stable (temp flag to detect when leaving)
+        this.visitingStable = false;
 
         this.initInputListeners();
         this.resizeCanvas();
@@ -136,16 +139,21 @@ class Game {
         this.state = 'playing';
         this.onlineMode = isOnline;
         this.wave = 1;
-        this.gold = 0;
+        // IMPORTANT: Do NOT reset gold or upgrades here!
+        // They persist across game sessions. Only reset combat stats.
         this.stats.maxSpeed = 0;
         this.stats.maxDmgDealt = 0;
         this.stats.wavesSurvived = 0;
 
-        // Reset upgrades
-        this.upgrades = { speed: 0, armor: 0, lance: 0, sharpness: 0, boost: 0 };
-
         // Create player in center
         this.player = new Player(this.arena.width / 2, this.arena.height / 2);
+        
+        // Apply current upgrade levels to the new player
+        Object.keys(this.upgrades).forEach(type => {
+            if (this.upgrades[type] > 0) {
+                this.player.upgrade(type, this.upgrades[type]);
+            }
+        });
 
         if (isOnline) {
             // In online mode, turning is much harder
@@ -173,6 +181,7 @@ class Game {
         this.ui.showOverlay('game');
         this.particles.clear();
         audio.playWhinny();
+        this.visitingStable = false;
     }
 
     startNextWave() {
@@ -189,9 +198,20 @@ class Game {
         
         this.particles.clear();
         audio.playWhinny();
+        this.visitingStable = false;
     }
 
     resetGame() {
+        // Completely reset the game: new wave 1, no gold, no upgrades
+        this.wave = 1;
+        this.gold = 0;
+        this.upgrades = {
+            speed: 0,
+            armor: 0,
+            lance: 0,
+            sharpness: 0,
+            boost: 0
+        };
         this.startGame();
     }
 
@@ -227,6 +247,8 @@ class Game {
     }
 
     updateStableUI() {
+        console.log('[Game] updateStableUI called');
+        this.visitingStable = true;
         this.ui.updateStableShop(this.gold, this.upgrades);
     }
 
@@ -241,8 +263,8 @@ class Game {
             this.gold -= cost;
             this.upgrades[type]++;
             
-            // Apply upgrade directly to player model if player exists
-            if (this.player) {
+            // Apply upgrade directly to player model if player exists and we're in-game
+            if (this.player && this.state === 'playing') {
                 this.player.upgrade(type, this.upgrades[type]);
             }
             
