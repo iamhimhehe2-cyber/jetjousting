@@ -64,10 +64,27 @@
             </div>
         </div>
 
+        <!-- USERNAME MODAL -->
+        <div id="username-modal" class="overlay">
+            <div class="menu-content glassmorphism text-center" style="max-width: 400px;">
+                <h2 class="text-gold">Welcome, Knight</h2>
+                <p>Enter your name to begin your jousting journey.</p>
+                <div style="margin: 20px 0;">
+                    <input id="username-input" type="text" maxlength="20" placeholder="Enter Knight Name" class="room-input" style="text-align: center; font-size: 16px;" />
+                </div>
+                <div class="menu-actions">
+                    <button id="btn-username-submit" class="btn btn-primary btn-glow">START JOUSTING</button>
+                </div>
+            </div>
+        </div>
+
         <!-- MAIN MENU -->
-        <div id="main-menu" class="overlay">
+        <div id="main-menu" class="overlay hidden">
             <div class="menu-content glassmorphism">
-                <h1 class="game-title">JET<span class="text-gold">JOUSTING</span></h1>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h1 class="game-title">JET<span class="text-gold">JOUSTING</span></h1>
+                    <div id="username-display" style="font-size: 14px; color: #ffd700; font-weight: bold;"></div>
+                </div>
                 <p class="game-tagline">The faster you ride, the harder they fall.</p>
                 
                 <div class="instructions-panel">
@@ -259,7 +276,11 @@
                     <div>Max Speed Reached: <span id="go-max-speed" class="text-gold">0 km/h</span></div>
                     <div>Highest Damage Dealt: <span id="go-max-dmg" class="text-red">0 DMG</span></div>
                 </div>
-                <div class="menu-actions">
+                <div id="online-rematch-section" class="menu-actions hidden">
+                    <button id="btn-rematch" class="btn btn-primary btn-glow">REMATCH ⚡</button>
+                    <button id="btn-quit-online" class="btn btn-secondary">BACK TO MENU</button>
+                </div>
+                <div id="offline-actions" class="menu-actions">
                     <button id="btn-retry" class="btn btn-primary btn-glow">JOUST AGAIN</button>
                     <button id="btn-stable-go" class="btn btn-secondary">VISIT STABLES</button>
                 </div>
