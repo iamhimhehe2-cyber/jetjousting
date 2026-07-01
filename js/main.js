@@ -6,6 +6,40 @@ import { Player, Enemy } from './entities.js';
 import { UIManager } from './ui.js';
 import { NetworkManager } from './network.js';
 
+// ─── PERSISTENT STORAGE MANAGER ────────────────────────────────────────────
+const StorageManager = {
+    saveGameState(game) {
+        const state = {
+            gold: game.gold,
+            upgrades: game.upgrades,
+            username: game.username
+        };
+        localStorage.setItem('jetJoustingState', JSON.stringify(state));
+    },
+
+    loadGameState() {
+        const saved = localStorage.getItem('jetJoustingState');
+        if (saved) {
+            try {
+                return JSON.parse(saved);
+            } catch (e) {
+                console.warn('Failed to parse saved state:', e);
+                return null;
+            }
+        }
+        return null;
+    },
+
+    saveUsername(username) {
+        localStorage.setItem('jetJoustingUsername', username);
+    },
+
+    loadUsername() {
+        return localStorage.getItem('jetJoustingUsername') || null;
+    }
+};
+
+// ─── GAME CLASS ────────────────────────────────────────────────────────────
 class Game {
     constructor() {
         this.canvas = document.getElementById('game-canvas');
@@ -22,6 +56,9 @@ class Game {
             gridSize: 100
         };
 
+        // Username (persistent)
+        this.username = StorageManager.loadUsername() || 'Knight';
+
         // Game State
         this.state = 'menu'; // 'menu', 'playing', 'waveclear', 'gameover'
         this.wave = 1;
@@ -35,6 +72,16 @@ class Game {
             sharpness: 0,
             boost: 0
         };
+
+        // Load persisted game state
+        const savedState = StorageManager.loadGameState();
+        if (savedState) {
+            this.gold = savedState.gold;
+            this.upgrades = savedState.upgrades;
+            if (savedState.username) {
+                this.username = savedState.username;
+            }
+        }
 
         // Entities & FX
         this.player = null;
@@ -64,7 +111,8 @@ class Game {
             onNextWave: () => this.startNextWave(),
             onResetGame: () => this.resetGame(),
             onOpenStable: () => this.updateStableUI(),
-            onBuyUpgrade: (type) => this.buyUpgrade(type)
+            onBuyUpgrade: (type) => this.buyUpgrade(type),
+            onRematch: () => this.rematchOnline()
         });
 
         // Online multiplayer
@@ -74,12 +122,12 @@ class Game {
         this.localReady = false;
         this.remoteReadyFlag = false;
 
-        // Track if we're visiting the stable (temp flag to detect when leaving)
-        this.visitingStable = false;
-
         this.initInputListeners();
         this.resizeCanvas();
         window.addEventListener('resize', () => this.resizeCanvas());
+
+        // Check if we need to show username modal
+        this.initUsernameModal();
 
         // Start animating
         this.lastTime = 0;
@@ -87,6 +135,49 @@ class Game {
 
         // Wire online lobby UI
         this.initOnlineUI();
+    }
+
+    // ─── USERNAME MODAL ────────────────────────────────────────────────────
+    initUsernameModal() {
+        const modal = document.getElementById('username-modal');
+        const input = document.getElementById('username-input');
+        const submitBtn = document.getElementById('btn-username-submit');
+
+        // If username is already set, hide modal
+        if (StorageManager.loadUsername()) {
+            if (modal) modal.classList.add('hidden');
+            this.updateUsernameDisplay();
+            return;
+        }
+
+        // Show modal and wait for input
+        if (modal) modal.classList.remove('hidden');
+        
+        if (submitBtn) {
+            submitBtn.addEventListener('click', () => {
+                const name = input.value.trim() || 'Knight';
+                this.username = name;
+                StorageManager.saveUsername(name);
+                if (modal) modal.classList.add('hidden');
+                this.updateUsernameDisplay();
+            });
+
+            // Allow Enter key to submit
+            if (input) {
+                input.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        submitBtn.click();
+                    }
+                });
+            }
+        }
+    }
+
+    updateUsernameDisplay() {
+        const display = document.getElementById('username-display');
+        if (display) {
+            display.innerText = `⚔️ ${this.username}`;
+        }
     }
 
     resizeCanvas() {
@@ -181,7 +272,6 @@ class Game {
         this.ui.showOverlay('game');
         this.particles.clear();
         audio.playWhinny();
-        this.visitingStable = false;
     }
 
     startNextWave() {
@@ -198,20 +288,23 @@ class Game {
         
         this.particles.clear();
         audio.playWhinny();
-        this.visitingStable = false;
+    }
+
+    rematchOnline() {
+        // Reset online match state and start new game
+        this.net.disconnect();
+        this.localReady = false;
+        this.remoteReadyFlag = false;
+        this.ui.showOverlay('online');
+        
+        // Trigger room creation sequence again
+        const btnHost = document.getElementById('btn-host');
+        if (btnHost) {
+            btnHost.click();
+        }
     }
 
     resetGame() {
-        // Completely reset the game: new wave 1, no gold, no upgrades
-        this.wave = 1;
-        this.gold = 0;
-        this.upgrades = {
-            speed: 0,
-            armor: 0,
-            lance: 0,
-            sharpness: 0,
-            boost: 0
-        };
         this.startGame();
     }
 
@@ -247,8 +340,6 @@ class Game {
     }
 
     updateStableUI() {
-        console.log('[Game] updateStableUI called');
-        this.visitingStable = true;
         this.ui.updateStableShop(this.gold, this.upgrades);
     }
 
@@ -263,10 +354,13 @@ class Game {
             this.gold -= cost;
             this.upgrades[type]++;
             
-            // Apply upgrade directly to player model if player exists and we're in-game
-            if (this.player && this.state === 'playing') {
+            // Apply upgrade directly to player model if player exists
+            if (this.player) {
                 this.player.upgrade(type, this.upgrades[type]);
             }
+            
+            // Save to persistent storage
+            StorageManager.saveGameState(this);
             
             audio.playClash(30); // Metallic ring confirm sound
             this.updateStableUI();
@@ -399,17 +493,23 @@ class Game {
         if (this.player.isDead) {
             this.state = 'gameover';
             audio.playDefeat();
-            this.ui.showGameOver(this.stats.wavesSurvived, this.stats.maxSpeed, this.stats.maxDmgDealt);
+            // Save progress before game over
+            StorageManager.saveGameState(this);
+            this.ui.showGameOver(this.stats.wavesSurvived, this.stats.maxSpeed, this.stats.maxDmgDealt, this.onlineMode);
         } else if (!this.onlineMode && this.enemies.length === 0) {
             this.state = 'waveclear';
             this.stats.wavesSurvived++;
             const waveLoot = 100 + this.wave * 50;
             this.gold += waveLoot;
+            // Save progress on wave clear
+            StorageManager.saveGameState(this);
             audio.playVictory();
             this.ui.showWaveClear(this.wave, waveLoot);
         } else if (this.onlineMode && this.remotePlayer && this.remotePlayer.isDead) {
             this.state = 'gameover'; // Reuse screen — winner sees "defeated" from opponent's POV
-            this.ui.showVictory();
+            // Save progress
+            StorageManager.saveGameState(this);
+            this.ui.showVictory(true);
         }
     }
 
@@ -794,133 +894,71 @@ class RemotePlayer {
         this.vel = Vector.create(0, 0);
         this.angle = 0;
         this.lanceAngle = 0;
+        this.radius = 25;
         this.health = 100;
         this.maxHealth = 100;
-        this.boostStamina = 100;
-        this.maxBoostStamina = 100;
-        this.isBoosting = false;
-        this.radius = 24;
-        this.mass = 1.2;
-        this.lanceLength = 70;
-        this.lanceWidth = 6;
         this.isDead = false;
-        this.hitFlashTimer = 0;
-        this.gallopTimer = 0;
+        this.flashCounter = 0;
     }
 
-    applyState(data) {
-        // Smooth interpolation of remote position
-        this.pos.x += (data.pos.x - this.pos.x) * 0.35;
-        this.pos.y += (data.pos.y - this.pos.y) * 0.35;
-        this.vel = data.vel;
-        this.angle = data.angle;
-        this.lanceAngle = data.lanceAngle;
-        this.health = data.health;
-        this.maxHealth = this.maxHealth || 100;
-        this.boostStamina = data.boostStamina;
-        this.isBoosting = data.isBoosting;
-        const speed = Math.sqrt(data.vel.x * data.vel.x + data.vel.y * data.vel.y);
-        this.gallopTimer += speed * 0.15;
+    update(state) {
+        if (state.pos) this.pos = Vector.create(state.pos.x, state.pos.y);
+        if (state.vel) this.vel = Vector.create(state.vel.x, state.vel.y);
+        if (state.angle !== undefined) this.angle = state.angle;
+        if (state.lanceAngle !== undefined) this.lanceAngle = state.lanceAngle;
+        if (state.health !== undefined) {
+            this.health = state.health;
+            if (this.health <= 0) this.isDead = true;
+        }
+    }
 
-        if (data.health <= 0) this.isDead = true;
+    takeDamage(amount) {
+        const actualDmg = Math.min(amount, this.health);
+        this.health -= actualDmg;
+        if (this.health <= 0) this.isDead = true;
+        return actualDmg;
     }
 
     flashHit() {
-        this.hitFlashTimer = 10;
+        this.flashCounter = 6;
     }
 
     draw(ctx) {
-        if (this.isDead) return;
-
-        const speed = Math.sqrt(this.vel.x * this.vel.x + this.vel.y * this.vel.y);
-        const isFlashing = this.hitFlashTimer > 0;
-        if (this.hitFlashTimer > 0) this.hitFlashTimer--;
-
-        ctx.save();
-        ctx.translate(this.pos.x, this.pos.y);
-
-        if (isFlashing) {
-            ctx.globalAlpha = 0.5 + Math.random() * 0.5;
+        if (this.flashCounter > 0) {
+            ctx.globalAlpha = 0.5;
+            this.flashCounter--;
         }
 
-        ctx.rotate(this.angle);
-
-        // Shadow
-        ctx.shadowColor = 'rgba(0,0,0,0.4)';
-        ctx.shadowBlur = 10;
-        ctx.shadowOffsetX = 5;
-        ctx.shadowOffsetY = 8;
-
-        // Galloping legs
-        const legSpread = 12;
-        const gallopSway = Math.sin(this.gallopTimer) * 8 * Math.min(1, speed / 2);
-        ctx.fillStyle = '#1a110a';
-        ctx.fillRect(12, -legSpread + gallopSway, 6, 4);
-        ctx.fillRect(12, legSpread - gallopSway, 6, 4);
-        ctx.fillRect(-16, -legSpread - gallopSway, 6, 4);
-        ctx.fillRect(-16, legSpread + gallopSway, 6, 4);
-
-        ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
-
-        // Red enemy horse (opponent color scheme)
-        ctx.fillStyle = '#7f1d1d';
-        ctx.beginPath(); ctx.ellipse(0, 0, 22, 11, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.ellipse(18, 0, 8, 5, 0, 0, Math.PI * 2); ctx.fill();
-
-        ctx.fillStyle = '#5c3a21';
-        ctx.fillRect(-6, -9, 12, 18);
-
-        // Red armor
-        ctx.fillStyle = '#ef4444';
-        ctx.beginPath(); ctx.arc(0, 0, 9, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#7f1d1d';
-        ctx.beginPath(); ctx.arc(2, 0, 5, 0, Math.PI * 2); ctx.fill();
-
-        // Dark plume
-        ctx.fillStyle = '#facc15';
+        // Horse body
+        ctx.fillStyle = '#8B4513';
         ctx.beginPath();
-        ctx.moveTo(-4, 0);
-        ctx.quadraticCurveTo(-15, -4, -18, -2);
-        ctx.quadraticCurveTo(-10, 0, -18, 2);
-        ctx.closePath();
+        ctx.ellipse(this.pos.x, this.pos.y, this.radius * 1.3, this.radius * 0.8, this.angle, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.restore();
+        // Health bar
+        const barWidth = 50;
+        const barHeight = 8;
+        ctx.fillStyle = '#333';
+        ctx.fillRect(this.pos.x - barWidth / 2, this.pos.y - this.radius - 25, barWidth, barHeight);
+        const healthPercent = Math.max(0, this.health / this.maxHealth);
+        ctx.fillStyle = healthPercent > 0.33 ? '#00ff00' : '#ff0000';
+        ctx.fillRect(this.pos.x - barWidth / 2, this.pos.y - this.radius - 25, barWidth * healthPercent, barHeight);
 
-        // Draw lance separately (free rotation)
-        ctx.save();
-        ctx.translate(this.pos.x, this.pos.y);
-        ctx.rotate(this.lanceAngle);
-        const sy = 9;
-        ctx.strokeStyle = '#8B5A2B'; ctx.lineWidth = this.lanceWidth; ctx.lineCap = 'round';
-        ctx.beginPath(); ctx.moveTo(5, sy); ctx.lineTo(this.lanceLength - 12, sy); ctx.stroke();
-        ctx.fillStyle = '#dc2626';
-        ctx.beginPath(); ctx.arc(10, sy, 7, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = '#e0e0e0'; ctx.fillStyle = '#ffffff'; ctx.lineWidth = 2;
+        // Lance
+        const lanceLength = 60;
+        const lanceStartX = this.pos.x + Math.cos(this.angle) * this.radius * 0.8;
+        const lanceStartY = this.pos.y + Math.sin(this.angle) * this.radius * 0.8;
+        const lanceEndX = lanceStartX + Math.cos(this.lanceAngle) * lanceLength;
+        const lanceEndY = lanceStartY + Math.sin(this.lanceAngle) * lanceLength;
+
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 4;
         ctx.beginPath();
-        ctx.moveTo(this.lanceLength - 12, sy - this.lanceWidth / 2);
-        ctx.lineTo(this.lanceLength, sy);
-        ctx.lineTo(this.lanceLength - 12, sy + this.lanceWidth / 2);
-        ctx.closePath(); ctx.fill(); ctx.stroke();
-        ctx.restore();
+        ctx.moveTo(lanceStartX, lanceStartY);
+        ctx.lineTo(lanceEndX, lanceEndY);
+        ctx.stroke();
 
-        // Health bar above remote player
-        const barW = 50;
-        const barH = 6;
-        const barX = this.pos.x - barW / 2;
-        const barY = this.pos.y - 42;
-        ctx.fillStyle = 'rgba(0,0,0,0.5)';
-        ctx.fillRect(barX, barY, barW, barH);
-        const pct = Math.max(0, this.health / this.maxHealth);
-        ctx.fillStyle = pct > 0.5 ? '#22c55e' : pct > 0.25 ? '#facc15' : '#ef4444';
-        ctx.fillRect(barX, barY, barW * pct, barH);
-
-        // "OPPONENT" label
-        ctx.font = "bold 10px 'Outfit', sans-serif";
-        ctx.fillStyle = '#ef4444';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'bottom';
-        ctx.fillText('OPPONENT', this.pos.x, barY - 2);
+        ctx.globalAlpha = 1.0;
     }
 }
 
@@ -939,104 +977,164 @@ Game.prototype.initOnlineUI = function() {
     };
 
     const showError = (msg) => {
-        const el = $('online-error');
-        el.classList.remove('hidden');
-        el.innerText = '⚠ ' + msg;
+        const err = $('online-error');
+        if (err) {
+            err.innerText = msg;
+            err.classList.remove('hidden');
+        }
     };
 
     const hideError = () => $('online-error').classList.add('hidden');
 
-    // Open the online lobby from main menu
-    $('btn-online').addEventListener('click', () => {
-        this.ui.showOverlay('online');
-        hideError();
-        $('online-status').classList.add('hidden');
-        $('online-ready-section').classList.add('hidden');
-        $('room-code-display').classList.add('hidden');
-    });
+    // ─── HOST FLOW ─────────────────────────────────────────────────────────
+    const btnHost = $('btn-host');
+    if (btnHost) {
+        btnHost.addEventListener('click', () => {
+            hideError();
+            this.net.createRoom();
+            const code = this.net.myPeerId.substring(0, 6).toUpperCase();
+            const codeDisplay = $('room-code-display');
+            const codeText = $('room-code-text');
+            if (codeDisplay) codeDisplay.classList.remove('hidden');
+            if (codeText) codeText.innerText = code;
+            setStatus('Waiting for opponent...', 'waiting');
 
-    $('btn-online-back').addEventListener('click', () => {
-        this.net.disconnect();
-        this.ui.showOverlay('main');
-    });
+            const hostSection = $('online-host-section');
+            if (hostSection) hostSection.style.display = 'none';
+        });
+    }
 
-    // HOST: Create room
-    $('btn-host').addEventListener('click', async () => {
-        hideError();
-        $('btn-host').disabled = true;
-        setStatus('Creating room...', 'connecting');
-        try {
-            const code = await this.net.createRoom();
-            $('room-code-text').innerText = code;
-            $('room-code-display').classList.remove('hidden');
-            setStatus('Waiting for opponent...', 'connecting');
+    // ─── COPY CODE ─────────────────────────────────────────────────────────
+    const btnCopy = $('btn-copy-code');
+    if (btnCopy) {
+        btnCopy.addEventListener('click', () => {
+            const code = $('room-code-text').innerText;
+            navigator.clipboard.writeText(code).then(() => {
+                btnCopy.innerText = 'COPIED!';
+                setTimeout(() => {
+                    btnCopy.innerText = 'COPY';
+                }, 1500);
+            });
+        });
+    }
 
-            this.net.onConnected = () => {
-                setStatus('Opponent connected!', 'connected');
-                $('online-ready-section').classList.remove('hidden');
-            };
-        } catch (e) {
-            showError(e);
-            $('btn-host').disabled = false;
-        }
-    });
+    // ─── JOIN FLOW ─────────────────────────────────────────────────────────
+    const btnJoin = $('btn-join');
+    const inputCode = $('room-code-input');
+    if (btnJoin) {
+        btnJoin.addEventListener('click', () => {
+            hideError();
+            const code = (inputCode.value || '').trim().toUpperCase();
+            if (!code) {
+                showError('Please enter a room code.');
+                return;
+            }
+            this.net.joinRoom(code);
+            setStatus('Connecting to room...', 'connecting');
+            const joinSection = $('online-join-section');
+            if (joinSection) joinSection.style.display = 'none';
+        });
+    }
 
-    // Copy room code
-    $('btn-copy-code').addEventListener('click', () => {
-        const code = $('room-code-text').innerText;
-        navigator.clipboard.writeText(code).catch(() => {});
-        $('btn-copy-code').innerText = 'COPIED!';
-        setTimeout(() => { $('btn-copy-code').innerText = 'COPY'; }, 1500);
-    });
+    // ─── READY BUTTON ─────────────────────────────────────────────────────
+    const btnReady = $('btn-online-ready');
+    if (btnReady) {
+        btnReady.addEventListener('click', () => {
+            this.localReady = true;
+            this.net.sendReady();
+            btnReady.disabled = true;
+            btnReady.innerText = 'WAITING...';
+        });
+    }
 
-    // GUEST: Join room
-    $('btn-join').addEventListener('click', async () => {
-        hideError();
-        const code = $('room-code-input').value.trim().toUpperCase();
-        if (code.length !== 6) { showError('Code must be 6 characters'); return; }
-        $('btn-join').disabled = true;
-        setStatus('Connecting to room...', 'connecting');
-        try {
-            await this.net.joinRoom(code);
-            this.net.onConnected = () => {
-                setStatus('Connected to host!', 'connected');
-                $('online-ready-section').classList.remove('hidden');
-            };
-        } catch (e) {
-            showError(e);
-            $('btn-join').disabled = false;
-        }
-    });
+    // ─── BACK BUTTON ──────────────────────────────────────────────────────
+    const btnBack = $('btn-online-back');
+    if (btnBack) {
+        btnBack.addEventListener('click', () => {
+            this.net.disconnect();
+            this.localReady = false;
+            this.remoteReadyFlag = false;
+            // Reset UI state
+            const hostSection = $('online-host-section');
+            const joinSection = $('online-join-section');
+            const readySection = $('online-ready-section');
+            const statusEl = $('online-status');
+            if (hostSection) hostSection.style.display = 'block';
+            if (joinSection) joinSection.style.display = 'block';
+            if (readySection) readySection.classList.add('hidden');
+            if (statusEl) statusEl.classList.add('hidden');
+            if (inputCode) inputCode.value = '';
+            if (btnReady) {
+                btnReady.disabled = false;
+                btnReady.innerText = 'READY UP ⚡';
+            }
+            this.ui.showOverlay('main');
+        });
+    }
 
-    // READY UP
-    $('btn-online-ready').addEventListener('click', () => {
-        this.localReady = true;
-        $('btn-online-ready').disabled = true;
-        $('btn-online-ready').innerText = 'WAITING FOR OPPONENT...';
-        this.net.sendReady();
-        if (this.net.remoteReady) this._startOnlineGame();
-    });
+    // ─── GAME OVER → REMATCH (online only) ────────────────────────────────
+    const btnRematch = $('btn-rematch');
+    if (btnRematch) {
+        btnRematch.addEventListener('click', () => {
+            this.rematchOnline();
+        });
+    }
+
+    const btnQuitOnline = $('btn-quit-online');
+    if (btnQuitOnline) {
+        btnQuitOnline.addEventListener('click', () => {
+            this.net.disconnect();
+            this.localReady = false;
+            this.remoteReadyFlag = false;
+            // Reset UI
+            const hostSection = $('online-host-section');
+            const joinSection = $('online-join-section');
+            const readySection = $('online-ready-section');
+            const statusEl = $('online-status');
+            if (hostSection) hostSection.style.display = 'block';
+            if (joinSection) joinSection.style.display = 'block';
+            if (readySection) readySection.classList.add('hidden');
+            if (statusEl) statusEl.classList.add('hidden');
+            if (inputCode) inputCode.value = '';
+            if (btnReady) {
+                btnReady.disabled = false;
+                btnReady.innerText = 'READY UP ⚡';
+            }
+            this.ui.showOverlay('main');
+        });
+    }
+
+    // ─── NETWORK CALLBACKS ──────────────────────────────────────────────────
+    this.net.onConnected = () => {
+        setStatus('Opponent connected!', 'connected');
+        const readySection = $('online-ready-section');
+        if (readySection) readySection.classList.remove('hidden');
+    };
 
     this.net.onRemoteReady = () => {
         this.remoteReadyFlag = true;
-        if (this.localReady) this._startOnlineGame();
+        if (this.localReady && this.remoteReadyFlag) {
+            // Both ready: start the game
+            this.startGame(true);
+        }
     };
 
-    this.net.onRemoteState = (data) => {
+    this.net.onRemoteState = (state) => {
         if (this.remotePlayer) {
-            this.remotePlayer.applyState(data);
+            this.remotePlayer.update(state);
         }
     };
 
     this.net.onRemoteHit = (damage) => {
-        if (!this.player || this.player.isDead) return;
-        const armorReduction = 1 + (this.upgrades.armor || 0) * 0.3;
-        const actualDmg = this.player.takeDamage(damage / armorReduction);
-        if (actualDmg > 0) {
-            audio.playClash(actualDmg);
-            audio.playGrunt();
-            this.particles.spawnText(this.player.pos.x, this.player.pos.y - 30, actualDmg, false);
-            this.ui.triggerShake(Math.min(18, actualDmg / 3), 10);
+        if (this.player) {
+            const armorReduction = 1 + (this.upgrades.armor || 0) * 0.3;
+            const actualDmg = this.player.takeDamage(damage / armorReduction);
+            if (actualDmg > 0) {
+                audio.playClash(actualDmg);
+                audio.playGrunt();
+                this.particles.spawnText(this.player.pos.x, this.player.pos.y - 30, actualDmg, false);
+                this.ui.triggerShake(Math.min(18, actualDmg / 3), 10);
+            }
         }
     };
 
