@@ -144,11 +144,12 @@ class Game {
         const submitBtn = document.getElementById('btn-username-submit');
 
         // If username is already set, hide modal
-        if (StorageManager.loadUsername()) {
-            if (modal) modal.classList.add('hidden');
-            this.updateUsernameDisplay();
-            return;
-        }
+if (StorageManager.loadUsername()) {
+    if (modal) modal.classList.add('hidden');
+    this.updateUsernameDisplay();
+    this.ui.showOverlay('main');
+    return;
+}
 
         // Show modal and wait for input
         if (modal) modal.classList.remove('hidden');
@@ -160,6 +161,7 @@ class Game {
                 StorageManager.saveUsername(name);
                 if (modal) modal.classList.add('hidden');
                 this.updateUsernameDisplay();
+                this.ui.showOverlay('main');
             });
 
             // Allow Enter key to submit
