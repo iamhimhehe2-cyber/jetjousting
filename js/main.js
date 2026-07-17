@@ -64,7 +64,8 @@ class Game {
             onNextWave: () => this.startNextWave(),
             onResetGame: () => this.resetGame(),
             onOpenStable: () => this.updateStableUI(),
-            onBuyUpgrade: (type) => this.buyUpgrade(type)
+            onBuyUpgrade: (type) => this.buyUpgrade(type),
+            onUsernameSet: (name) => this.setUsername(name)
         });
 
         // Online multiplayer
@@ -84,6 +85,15 @@ class Game {
 
         // Wire online lobby UI
         this.initOnlineUI();
+
+        // Start by asking for username
+        this.username = "SIR LANCELOT";
+        this.ui.showOverlay('username');
+    }
+
+    setUsername(name) {
+        this.username = name;
+        this.ui.showOverlay('main');
     }
 
     resizeCanvas() {
@@ -146,6 +156,7 @@ class Game {
 
         // Create player in center
         this.player = new Player(this.arena.width / 2, this.arena.height / 2);
+        this.player.name = this.username;
 
         if (isOnline) {
             // In online mode, turning is much harder
@@ -418,8 +429,13 @@ class Game {
                 const strike = checkLanceStrike(this.player, this.remotePlayer);
                 if (strike.collided && strike.impactSpeed > 0.5) {
                     const multiplier = Math.max(0.5, strike.impactSpeed / 1.5);
-                    const damage = this.player.baseDamage * multiplier;
+                    let damage = this.player.baseDamage * multiplier;
                     const isCrit = multiplier > 3.0;
+
+                    if (strike.shieldHit) {
+                        damage *= 0.25; // Shield blocks 75% of damage
+                        this.particles.spawnText(strike.point.x, strike.point.y, 'BLOCKED', false, '#3b82f6');
+                    }
 
                     // Tell the remote side they took damage
                     this.net.sendHit(damage);
@@ -428,8 +444,12 @@ class Game {
                     this.remotePlayer.flashHit();
 
                     const knockbackDir = Vector.normalize(this.player.vel);
-                    this.particles.spawnSparks(strike.point.x, strike.point.y, Math.ceil(damage / 2));
-                    this.particles.spawnBlood(strike.point.x, strike.point.y, knockbackDir, multiplier / 3);
+                    if (strike.shieldHit) {
+                        this.particles.spawnSparks(strike.point.x, strike.point.y, Math.ceil(damage / 2));
+                    } else {
+                        this.particles.spawnSparks(strike.point.x, strike.point.y, Math.ceil(damage / 2));
+                        this.particles.spawnBlood(strike.point.x, strike.point.y, knockbackDir, multiplier / 3);
+                    }
                     this.particles.spawnText(strike.point.x, strike.point.y, damage, isCrit);
                     audio.playClash(damage);
 
@@ -461,45 +481,38 @@ class Game {
             if (strike.collided) {
                 // Rel velocity dot product dictates speed factor.
                 // We reference a standard velocity factor (e.g. 5.0) where 1x base damage is dealt.
-                const speedFactor = strike.impactSpeed;
-                
-                // Only deal damage if closing in speed is positive (moving towards defender)
-                if (speedFactor > 0.5) {
-                    // Speed-based damage: scales linearly/exponentially with speed factor!
-                    // If player is boosting at top speed, damage gets multiplier
-                    const multiplier = Math.max(0.5, speedFactor / 1.5);
-                    const damage = this.player.baseDamage * multiplier;
-                    const isCrit = multiplier > 3.0;
+            if (strike.collided && strike.impactSpeed > 0.5) {
+                // Calculate damage based on relative speed
+                const multiplier = Math.max(0.5, strike.impactSpeed / 1.5);
+                let damage = this.player.baseDamage * multiplier;
+                const isCrit = multiplier > 3.0;
 
-                    // Apply damage
-                    const actualDmg = enemy.takeDamage(damage);
+                if (strike.shieldHit) {
+                    damage *= 0.25; // Shield blocks 75% of damage
+                    this.particles.spawnText(strike.point.x, strike.point.y, 'BLOCKED', false, '#3b82f6');
+                }
+
+                const actualDmg = enemy.takeDamage(damage);
+                if (actualDmg > 0) {
+                    this.stats.maxDmgDealt = Math.max(this.stats.maxDmgDealt, actualDmg);
                     
-                    if (actualDmg > 0) {
-                        // Track statistics
-                        if (actualDmg > this.stats.maxDmgDealt) {
-                            this.stats.maxDmgDealt = actualDmg;
-                        }
-
-                        // Play Clash sound
-                        audio.playClash(actualDmg);
-                        
-                        // Push enemy backwards based on collision impact force
-                        const knockbackDir = Vector.normalize(this.player.vel);
-                        const knockbackForce = Math.max(3, speedFactor * 1.5) / enemy.mass;
-                        enemy.vel = Vector.add(enemy.vel, Vector.mult(knockbackDir, knockbackForce));
-
-                        // Spawn VFX
+                    // Knockback
+                    const knockbackDir = Vector.normalize(this.player.vel);
+                    enemy.vel = Vector.add(enemy.vel, Vector.mult(knockbackDir, multiplier * 2));
+                    
+                    // FX
+                    if (strike.shieldHit) {
+                        this.particles.spawnSparks(strike.point.x, strike.point.y, 8);
+                    } else {
                         this.particles.spawnSparks(strike.point.x, strike.point.y, Math.ceil(actualDmg / 2));
                         this.particles.spawnBlood(strike.point.x, strike.point.y, knockbackDir, multiplier / 3);
-                        this.particles.spawnText(strike.point.x, strike.point.y, actualDmg, isCrit);
-
-                        // Trigger heavy impact shake and hit-stop freeze frames
-                        const intensity = Math.min(20, actualDmg / 4);
-                        const freezeFrames = Math.min(12, Math.floor(actualDmg / 8));
-                        
-                        this.ui.triggerShake(intensity, Math.max(10, freezeFrames * 2));
-                        this.hitStopDuration = freezeFrames;
                     }
+                    this.particles.spawnText(strike.point.x, strike.point.y, actualDmg, isCrit);
+                    audio.playClash(actualDmg);
+                    
+                    // Screen shake
+                    const intensity = Math.min(20, actualDmg / 4);
+                    this.ui.triggerShake(intensity, 12);
                 }
             }
         });
@@ -509,34 +522,34 @@ class Game {
             if (enemy.isDead || this.player.isDead) return;
 
             const strike = checkLanceStrike(enemy, this.player);
-            if (strike.collided) {
-                const speedFactor = strike.impactSpeed;
+            if (strike.collided && strike.impactSpeed > 0.5) {
+                const multiplier = Math.max(0.5, strike.impactSpeed / 1.5);
+                const armorReduction = 1 + (this.upgrades.armor || 0) * 0.3;
+                let damage = (enemy.baseDamage * multiplier) / armorReduction;
                 
-                if (speedFactor > 0.5) {
-                    // Speed-based damage received by player, reduced by player armor upgrade
-                    const armorReduction = 1 + this.upgrades.armor * 0.3; // 30% reduction per level
-                    const multiplier = Math.max(0.5, speedFactor / 1.5);
-                    const damage = (enemy.baseDamage * multiplier) / armorReduction;
+                if (strike.shieldHit) {
+                    damage *= 0.25; // Shield blocks 75% of damage
+                    this.particles.spawnText(strike.point.x, strike.point.y, 'BLOCKED', false, '#3b82f6');
+                }
 
-                    const actualDmg = this.player.takeDamage(damage);
-                    if (actualDmg > 0) {
-                        audio.playClash(actualDmg);
-                        audio.playGrunt();
-
-                        // Knock player back
-                        const knockbackDir = Vector.normalize(enemy.vel);
-                        const knockbackForce = Math.max(3, speedFactor * 1.2) / this.player.mass;
-                        this.player.vel = Vector.add(this.player.vel, Vector.mult(knockbackDir, knockbackForce));
-
-                        // Spawn VFX
+                const actualDmg = this.player.takeDamage(damage);
+                if (actualDmg > 0) {
+                    const knockbackDir = Vector.normalize(enemy.vel);
+                    // Player takes less knockback based on armor
+                    this.player.vel = Vector.add(this.player.vel, Vector.mult(knockbackDir, (multiplier * 2) / armorReduction));
+                    
+                    if (strike.shieldHit) {
+                        this.particles.spawnSparks(strike.point.x, strike.point.y, 8);
+                    } else {
                         this.particles.spawnSparks(strike.point.x, strike.point.y, Math.ceil(actualDmg / 2));
                         this.particles.spawnBlood(strike.point.x, strike.point.y, knockbackDir, multiplier / 3);
-                        this.particles.spawnText(strike.point.x, strike.point.y, actualDmg, false);
-
-                        // Trigger screen shake
-                        const intensity = Math.min(18, actualDmg / 3);
-                        this.ui.triggerShake(intensity, 12);
                     }
+                    this.particles.spawnText(strike.point.x, strike.point.y, actualDmg, false); // enemies don't crit text
+                    audio.playClash(actualDmg);
+                    audio.playGrunt();
+                    
+                    const intensity = Math.min(18, actualDmg / 3);
+                    this.ui.triggerShake(intensity, 10);
                 }
             }
         });

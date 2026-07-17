@@ -156,11 +156,26 @@ export function checkLanceStrike(attacker, defender) {
         // If the attacker is moving fast, the impact is hard even if the defender is still.
         // Thus, speedAlongLance represents how fast they are closing in on the lance axis.
         
+        // Determine if it hits the shield (left side of the horse)
+        // Defender's facing angle is defender.angle.
+        // Impact vector relative to defender center:
+        const impactVec = Vector.sub(closestPoint, C);
+        const impactAngle = Math.atan2(impactVec.y, impactVec.x);
+        
+        // Relative angle: 0 is front, -PI/2 is left side, PI/2 is right side, PI is back
+        let relAngle = impactAngle - defender.angle;
+        while (relAngle < -Math.PI) relAngle += Math.PI * 2;
+        while (relAngle > Math.PI) relAngle -= Math.PI * 2;
+        
+        // Shield covers roughly the left/front-left side (from 0 to -PI)
+        const shieldHit = (relAngle < 0.2 && relAngle > -Math.PI * 0.8);
+
         return {
             collided: true,
             impactSpeed: speedAlongLance,
             point: closestPoint,
-            lanceFraction: t // Where on the lance did the collision happen (0 is base, 1 is tip)
+            lanceFraction: t, // Where on the lance did the collision happen (0 is base, 1 is tip)
+            shieldHit: shieldHit
         };
     }
 

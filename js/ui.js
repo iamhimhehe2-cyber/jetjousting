@@ -22,6 +22,7 @@ export class UIManager {
             waveClearMenu: document.getElementById('wave-clear-menu'),
             gameOverMenu: document.getElementById('game-over-menu'),
             onlineMenu: document.getElementById('online-menu'),
+            usernameMenu: document.getElementById('username-menu'),
             
             // Buttons
             btnStart: document.getElementById('btn-start'),
@@ -32,8 +33,10 @@ export class UIManager {
             btnStableGo: document.getElementById('btn-stable-go'),
             btnNextWave: document.getElementById('btn-next-wave'),
             btnRetry: document.getElementById('btn-retry'),
+            btnUsernameGo: document.getElementById('btn-username-go'),
             
-            // Shop Details
+            // Inputs & Details
+            usernameInput: document.getElementById('username-input'),
             shopGold: document.getElementById('shop-gold'),
             waveClearNum: document.getElementById('wave-clear-num'),
             waveClearLoot: document.getElementById('wave-clear-loot'),
@@ -68,6 +71,16 @@ export class UIManager {
                 document.activeElement.blur();
             }
         };
+
+        // Username Entry
+        this.dom.btnUsernameGo.addEventListener('click', () => {
+            blurActive();
+            let name = this.dom.usernameInput.value.trim();
+            if (!name) name = "SIR LANCELOT";
+            if (this.callbacks.onUsernameSet) {
+                this.callbacks.onUsernameSet(name.toUpperCase());
+            }
+        });
 
         // Main Menu
         this.dom.btnStart.addEventListener('click', () => {
@@ -127,6 +140,7 @@ export class UIManager {
         this.dom.waveClearMenu.classList.add('hidden');
         this.dom.gameOverMenu.classList.add('hidden');
         this.dom.onlineMenu.classList.add('hidden');
+        this.dom.usernameMenu.classList.add('hidden');
         this.dom.hud.classList.add('hidden');
 
         // Stop active screen shake on entering any menu overlay
@@ -151,6 +165,9 @@ export class UIManager {
             this.dom.gameOverMenu.classList.remove('hidden');
         } else if (name === 'online') {
             this.dom.onlineMenu.classList.remove('hidden');
+        } else if (name === 'username') {
+            this.dom.usernameMenu.classList.remove('hidden');
+            this.dom.usernameInput.focus();
         }
     }
 

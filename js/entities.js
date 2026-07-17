@@ -211,6 +211,24 @@ class Knight {
         ctx.stroke();
 
         ctx.restore();
+        ctx.restore();
+
+        // --- 8. DRAW NAME LABEL ---
+        ctx.save();
+        ctx.font = "bold 10px 'Outfit', sans-serif";
+        ctx.fillStyle = this.name === "Player Knight" ? '#facc15' : '#ef4444';
+        if (this.name && this.name !== "Knight") {
+             ctx.fillStyle = '#facc15';
+        }
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        // Draw shadow
+        ctx.shadowColor = 'rgba(0,0,0,0.8)';
+        ctx.shadowBlur = 4;
+        ctx.shadowOffsetX = 1;
+        ctx.shadowOffsetY = 1;
+        ctx.fillText(this.name, this.pos.x, this.pos.y - 32);
+        ctx.restore();
     }
 }
 

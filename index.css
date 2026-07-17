@@ -727,3 +727,17 @@ h3 {
     padding: 8px 16px;
 }
 
+/* ── Username Entry ─────────────────────────────────────────────────── */
+
+.username-row {
+    display: flex;
+    justify-content: center;
+    margin: 16px 0;
+}
+
+.username-input {
+    width: 260px;
+    font-size: 1.3rem;
+    letter-spacing: 3px;
+}
+
