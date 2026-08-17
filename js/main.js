@@ -478,9 +478,6 @@ class Game {
             if (enemy.isDead) return;
 
             const strike = checkLanceStrike(this.player, enemy);
-            if (strike.collided) {
-                // Rel velocity dot product dictates speed factor.
-                // We reference a standard velocity factor (e.g. 5.0) where 1x base damage is dealt.
             if (strike.collided && strike.impactSpeed > 0.5) {
                 // Calculate damage based on relative speed
                 const multiplier = Math.max(0.5, strike.impactSpeed / 1.5);
