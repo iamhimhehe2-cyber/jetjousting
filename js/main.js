@@ -1,10 +1,10 @@
 // Jet Jousting: Main entry point, state manager, and game loop.
-import { Vector, resolveHorseCollisions, checkLanceStrike } from './physics.js?v=2';
-import { audio } from './audio.js?v=2';
-import { ParticleSystem } from './particles.js?v=2';
-import { Player, Enemy } from './entities.js?v=2';
-import { UIManager } from './ui.js?v=2';
-import { NetworkManager } from './network.js?v=2';
+import { Vector, resolveHorseCollisions, checkLanceStrike } from './physics.js?v=3';
+import { audio } from './audio.js?v=3';
+import { ParticleSystem } from './particles.js?v=3';
+import { Player, Enemy } from './entities.js?v=3';
+import { UIManager } from './ui.js?v=3';
+import { NetworkManager } from './network.js?v=3';
 
 class Game {
     constructor() {
