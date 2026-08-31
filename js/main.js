@@ -6,6 +6,9 @@ import { Player, Enemy } from './entities.js?v=3';
 import { UIManager } from './ui.js?v=3';
 import { NetworkManager } from './network.js?v=3';
 
+const PROFILE_STORAGE_KEY = 'jet-jousting-profile-v1';
+const MAX_UPGRADE_LEVEL = 5;
+
 class Game {
     constructor() {
         this.canvas = document.getElementById('game-canvas');
@@ -35,6 +38,9 @@ class Game {
             sharpness: 0,
             boost: 0
         };
+        this.username = 'SIR LANCELOT';
+        this.hasSavedUsername = false;
+        this.loadProfile();
 
         // Entities & FX
         this.player = null;
@@ -86,13 +92,60 @@ class Game {
         // Wire online lobby UI
         this.initOnlineUI();
 
-        // Start by asking for username
-        this.username = "SIR LANCELOT";
-        this.ui.showOverlay('username');
+        // New players choose a name; returning players continue with their saved profile.
+        this.ui.showOverlay(this.hasSavedUsername ? 'main' : 'username');
+    }
+
+    loadProfile() {
+        try {
+            const rawProfile = window.localStorage.getItem(PROFILE_STORAGE_KEY);
+            if (!rawProfile) return;
+
+            const profile = JSON.parse(rawProfile);
+            const savedName = typeof profile.username === 'string'
+                ? profile.username.trim().slice(0, 16).toUpperCase()
+                : '';
+            if (savedName) {
+                this.username = savedName;
+                this.hasSavedUsername = true;
+            }
+
+            const savedGold = Number(profile.gold);
+            if (Number.isFinite(savedGold) && savedGold >= 0) {
+                this.gold = Math.floor(savedGold);
+            }
+
+            if (profile.upgrades && typeof profile.upgrades === 'object') {
+                Object.keys(this.upgrades).forEach((type) => {
+                    const level = Number(profile.upgrades[type]);
+                    if (Number.isInteger(level) && level >= 0 && level <= MAX_UPGRADE_LEVEL) {
+                        this.upgrades[type] = level;
+                    }
+                });
+            }
+        } catch (error) {
+            // Corrupt or blocked browser storage should never stop the game from loading.
+            console.warn('Unable to load saved Jet Jousting profile.', error);
+        }
+    }
+
+    saveProfile() {
+        try {
+            window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify({
+                username: this.username,
+                gold: Math.floor(this.gold),
+                upgrades: this.upgrades
+            }));
+        } catch (error) {
+            console.warn('Unable to save Jet Jousting profile.', error);
+        }
     }
 
     setUsername(name) {
-        this.username = name;
+        const cleanedName = typeof name === 'string' ? name.trim().slice(0, 16).toUpperCase() : '';
+        this.username = cleanedName || 'SIR LANCELOT';
+        this.hasSavedUsername = true;
+        this.saveProfile();
         this.ui.showOverlay('main');
     }
 
@@ -146,17 +199,16 @@ class Game {
         this.state = 'playing';
         this.onlineMode = isOnline;
         this.wave = 1;
-        this.gold = 0;
         this.stats.maxSpeed = 0;
         this.stats.maxDmgDealt = 0;
         this.stats.wavesSurvived = 0;
 
-        // Reset upgrades
-        this.upgrades = { speed: 0, armor: 0, lance: 0, sharpness: 0, boost: 0 };
-
-        // Create player in center
+        // Create player with the permanently owned upgrades.
         this.player = new Player(this.arena.width / 2, this.arena.height / 2);
         this.player.name = this.username;
+        Object.entries(this.upgrades).forEach(([type, level]) => {
+            if (level > 0) this.player.upgrade(type, level);
+        });
 
         if (isOnline) {
             // In online mode, turning is much harder
@@ -171,8 +223,9 @@ class Game {
                 this.player.pos = Vector.create(this.arena.width / 2 + 300, this.arena.height / 2);
             }
 
-            // Remote player entity (no AI, driven by network)
-            this.remotePlayer = new RemotePlayer(this.player.pos.x, this.player.pos.y);
+            // Start the rendered opponent on the other side until its first network state arrives.
+            const remoteSpawnX = this.arena.width / 2 + (isHost ? -300 : 300);
+            this.remotePlayer = new RemotePlayer(remoteSpawnX, this.arena.height / 2);
             this.enemies = []; // No AI enemies in online mode
         } else {
             this.player.turnRate = 0.15; // Normal singleplayer turning
@@ -251,6 +304,7 @@ class Game {
         if (this.gold >= cost) {
             this.gold -= cost;
             this.upgrades[type]++;
+            this.saveProfile();
             
             // Apply upgrade directly to player model if player exists
             if (this.player) {
@@ -310,7 +364,8 @@ class Game {
                 if (enemy.isDead) {
                     const bounty = Math.round(45 + Math.random() * 25 + this.wave * 10);
                     this.gold += bounty;
-                    this.particles.spawnText(enemy.pos.x, enemy.pos.y, `+$${bounty}`);
+                    this.saveProfile();
+                    this.particles.spawnText(enemy.pos.x, enemy.pos.y, `+${bounty}`);
                     audio.playVictory();
                     this.enemies.splice(i, 1);
                 }
@@ -394,6 +449,7 @@ class Game {
             this.stats.wavesSurvived++;
             const waveLoot = 100 + this.wave * 50;
             this.gold += waveLoot;
+            this.saveProfile();
             audio.playVictory();
             this.ui.showWaveClear(this.wave, waveLoot);
         } else if (this.onlineMode && this.remotePlayer && this.remotePlayer.isDead) {
