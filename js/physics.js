@@ -114,70 +114,47 @@ export function resolveHorseCollisions(h1, h2) {
  * Returns details of the collision: { collided: boolean, impactSpeed: number, point: Vector }
  */
 export function checkLanceStrike(attacker, defender) {
-    // 1. Define the lance line segment AB
-    // The lance starts at attacker center + offset in lance direction (so it starts outside horse body)
     const lanceDir = { x: Math.cos(attacker.lanceAngle), y: Math.sin(attacker.lanceAngle) };
-    
-    // Lance start point A (just outside the horse's radius)
-    const startOffset = attacker.radius * 0.8;
-    const startPoint = Vector.add(attacker.pos, Vector.mult(lanceDir, startOffset));
-    
-    // Lance end point B (extended by lance length)
-    const endPoint = Vector.add(startPoint, Vector.mult(lanceDir, attacker.lanceLength));
+    const lanceNormal = { x: -lanceDir.y, y: lanceDir.x };
 
-    // 2. Find the closest point P on segment AB to defender circle center C
-    const C = defender.pos;
-    const AB = Vector.sub(endPoint, startPoint);
-    const AC = Vector.sub(C, startPoint);
+    // Match the rendered tip: the lance is held 9px below its rotation axis.
+    const shoulderOffset = 9;
+    const tipPoint = Vector.add(
+        Vector.add(attacker.pos, Vector.mult(lanceDir, attacker.lanceLength)),
+        Vector.mult(lanceNormal, shoulderOffset)
+    );
+    const hitRadius = defender.radius + Math.max(2, (attacker.lanceWidth || 0) / 2);
+    const distToTip = Vector.dist(defender.pos, tipPoint);
 
-    const abLenSq = Vector.magSq(AB);
-    if (abLenSq === 0) return { collided: false };
-
-    // Projection fraction t, clamped to [0, 1] to stay on the segment
-    let t = Vector.dot(AC, AB) / abLenSq;
-    t = Math.max(0, Math.min(1, t));
-
-    // Closest point on the lance segment
-    const closestPoint = Vector.add(startPoint, Vector.mult(AB, t));
-
-    // Distance from closest point to defender circle center
-    const distToCenter = Vector.dist(C, closestPoint);
-
-    // 3. Collision check
-    if (distToCenter < defender.radius) {
-        // It's a hit! Now let's calculate relative velocity along the lance axis
-        // We only care about velocity moving TOWARDS the defender
-        const relativeVel = Vector.sub(attacker.vel, defender.vel);
-        
-        // Project relative velocity onto the lance direction
-        const speedAlongLance = Vector.dot(relativeVel, lanceDir);
-
-        // We also want to include the absolute movement speed of the attacker if it's a direct charge.
-        // If the attacker is moving fast, the impact is hard even if the defender is still.
-        // Thus, speedAlongLance represents how fast they are closing in on the lance axis.
-        
-        // Determine if it hits the shield (left side of the horse)
-        // Defender's facing angle is defender.angle.
-        // Impact vector relative to defender center:
-        const impactVec = Vector.sub(closestPoint, C);
-        const impactAngle = Math.atan2(impactVec.y, impactVec.x);
-        
-        // Relative angle: 0 is front, -PI/2 is left side, PI/2 is right side, PI is back
-        let relAngle = impactAngle - defender.angle;
-        while (relAngle < -Math.PI) relAngle += Math.PI * 2;
-        while (relAngle > Math.PI) relAngle -= Math.PI * 2;
-        
-        // Shield covers roughly the left/front-left side (from 0 to -PI)
-        const shieldHit = (relAngle < 0.2 && relAngle > -Math.PI * 0.8);
-
-        return {
-            collided: true,
-            impactSpeed: speedAlongLance,
-            point: closestPoint,
-            lanceFraction: t, // Where on the lance did the collision happen (0 is base, 1 is tip)
-            shieldHit: shieldHit
-        };
+    // A lance can strike a target once per continuous contact. It re-arms only
+    // after the tip leaves the target, preventing overlap from causing repeat hits.
+    if (distToTip >= hitRadius) {
+        if (attacker.lanceContactTargets) attacker.lanceContactTargets.delete(defender);
+        return { collided: false };
     }
 
-    return { collided: false };
+    if (!attacker.lanceContactTargets) attacker.lanceContactTargets = new WeakSet();
+    if (attacker.lanceContactTargets.has(defender)) {
+        return { collided: false };
+    }
+    attacker.lanceContactTargets.add(defender);
+
+    const relativeVel = Vector.sub(attacker.vel, defender.vel);
+    const speedAlongLance = Vector.dot(relativeVel, lanceDir);
+
+    // Determine whether the tip contacted the defender's shield side.
+    const impactVec = Vector.sub(tipPoint, defender.pos);
+    const impactAngle = Math.atan2(impactVec.y, impactVec.x);
+    let relAngle = impactAngle - defender.angle;
+    while (relAngle < -Math.PI) relAngle += Math.PI * 2;
+    while (relAngle > Math.PI) relAngle -= Math.PI * 2;
+    const shieldHit = relAngle < 0.2 && relAngle > -Math.PI * 0.8;
+
+    return {
+        collided: true,
+        impactSpeed: speedAlongLance,
+        point: tipPoint,
+        lanceFraction: 1,
+        shieldHit
+    };
 }
